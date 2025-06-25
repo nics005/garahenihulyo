@@ -3,9 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MotorShop POS</title>
+    <title>Garahe ni Hulyo POS</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- jsPDF and html2canvas for PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         /* Custom scrollbar for a metallic look */
         ::-webkit-scrollbar {
@@ -174,7 +177,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, updateDoc, addDoc, onSnapshot, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, addDoc, deleteDoc, onSnapshot, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Expose Firebase objects globally for use in the main script
         window.firebase = {
@@ -189,6 +192,7 @@
             setDoc,
             updateDoc,
             addDoc,
+            deleteDoc, // Added deleteDoc here
             onSnapshot,
             collection,
             query,
@@ -204,9 +208,9 @@
         <!-- Top Header Panel -->
         <header id="main-header">
             <div class="flex items-center space-x-4">
-                <!-- Placeholder for logo/icon -->
-                <img src="https://placehold.co/50x50/3b82f6/FFFFFF?text=M" alt="MotorShop Logo" class="rounded-full">
-                <h1 class="text-3xl font-extrabold text-white">MotorShop POS System</h1>
+                <!-- Custom logo based on user request -->
+                <img src="https://scontent.fmnl17-2.fna.fbcdn.net/v/t39.30808-6/432725210_122115657752230587_8420052317826264936_n.jpg?_nc_cat=107&ccb=1-7&_nc_sid=6ee11a&_nc_eui2=AeFQuix_sgAinwvqEloWRmRrKmfC3maObI8qZ8LeZo5sj8vAQqr_JC9Fpw20JNKdwyGEmKxHmeCS13eK7cNozFC4&_nc_ohc=yXMR9-p-LkAQ7kNvwEGM_iE&_nc_oc=AdkR9Ic0Mv9IkLgZKC9xU5_Me3UPAFxAPa3C_vdUioSCL4JuWwbXpHRxqo946zUguqM&_nc_zt=23&_nc_ht=scontent.fmnl17-2.fna&_nc_gid=BW0dXenNjVSN0gfgFBLyNg&oh=00_AfNVOOLzzAt2XcEsqDJf0PXbRUm3bxfLEljZ6djGhEP5uw&oe=68620775" alt="Garahe ni Hulyo Logo" class="rounded-full w-12 h-12 object-cover">
+                <h1 class="text-3xl font-extrabold text-white">Garahe ni Hulyo POS System</h1>
             </div>
             <!-- User ID Display - Moved to header for visibility -->
             <div class="text-sm text-gray-400 mt-2 md:mt-0">
@@ -216,22 +220,23 @@
 
         <!-- Left Sidebar: Navigation & Management -->
         <div id="left-sidebar">
-            <h2 class="text-2xl font-bold text-white mb-6 text-center">Navigation</h2>
+            <!-- Removed Navigation H2 heading -->
 
             <!-- Navigation Bar for Main Tabs -->
             <div class="flex flex-col space-y-4 mb-6 bg-gray-800 p-3 rounded-lg shadow-inner border border-gray-700">
-                <button id="tab-inventory" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200 active">Inventory</button>
+                <button id="tab-inventory" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200 active">Dashboard</button>
                 <button id="tab-manage-products" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200">Manage Products</button>
+                <button id="tab-inventory-master" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200">Inventory Master</button>
                 <button id="tab-report-logs" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200">Report Logs</button>
+                 <button id="tab-sales-report" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200">Sales Report</button>
             </div>
         </div>
 
         <!-- Main Content Area: Inventory/Product Listing (adapting from original left panel) -->
         <div id="main-content-area">
-            <h1 class="text-3xl font-bold text-white mb-6 text-center">Product Listing</h1>
-
             <!-- Inventory Content Area -->
             <div id="inventory-content" class="tab-content flex-1 flex flex-col">
+                <h1 class="text-3xl font-bold text-white mb-6 text-center">Product Listing</h1>
                 <!-- Search Bar -->
                 <div class="mb-6">
                     <input type="text" id="inventory-search" placeholder="Search for parts..."
@@ -249,8 +254,29 @@
                 </div>
             </div>
 
-            <!-- Report Logs Content Area - Moved here for now, but usually in a separate view -->
-            <div id="report-logs-content" class="tab-content hidden flex-1 flex flex-col">
+            <!-- Inventory Master Content Area -->
+            <div id="inventory-master-content" class="tab-content hidden flex-1 flex-col">
+                <h1 class="text-3xl font-bold text-white mb-6 text-center">Inventory Master List</h1>
+                <!-- Search Bar for Master List -->
+                <div class="mb-6">
+                    <input type="text" id="master-list-search" placeholder="Search master list items..."
+                           class="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 placeholder-gray-500
+                                  focus:outline-none focus:ring-2 focus:ring-blue-600 transition duration-200">
+                </div>
+                <!-- Loading Indicator for Master List -->
+                <div id="master-list-loading" class="flex justify-center items-center h-full hidden">
+                    <div class="spinner"></div>
+                    <p class="ml-3 text-gray-400">Loading Master List...</p>
+                </div>
+                <!-- Master List -->
+                <div id="master-list" class="flex-1 overflow-y-auto pr-2">
+                    <!-- Master list items will be rendered here by JavaScript -->
+                </div>
+            </div>
+
+
+            <!-- Report Logs Content Area -->
+            <div id="report-logs-content" class="tab-content hidden flex-1 flex-col">
                 <h3 class="text-2xl font-bold text-white mb-4 text-center">Sales Report Logs</h3>
                 <!-- Loading Indicator for Sales Logs -->
                 <div id="sales-log-loading" class="flex justify-center items-center h-full hidden">
@@ -262,11 +288,43 @@
                     <p class="text-gray-400 text-center py-8" id="empty-logs-message">No sales records available yet.</p>
                 </div>
             </div>
+
+            <!-- Sales Report Content Area -->
+            <div id="sales-report-content" class="tab-content hidden flex-1 flex-col">
+                <h3 class="text-2xl font-bold text-white mb-4 text-center">Total Sales Report</h3>
+                <div class="flex justify-center space-x-4 mb-6">
+                    <button id="filter-daily" class="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 active">Daily</button>
+                    <button id="filter-weekly" class="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600">Weekly</button>
+                    <button id="filter-monthly" class="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600">Monthly</button>
+                </div>
+
+                <div class="bg-gray-800 p-6 rounded-lg shadow-md border border-gray-700 mb-6 text-center">
+                    <h4 class="text-xl font-semibold text-blue-300 mb-2">Total Sales for Period:</h4>
+                    <span id="report-total-sales" class="text-4xl font-extrabold text-white">₱0.00</span>
+                    <p id="report-period-info" class="text-gray-400 text-sm mt-2"></p>
+                </div>
+
+                <div class="bg-gray-800 p-6 rounded-lg shadow-md border border-gray-700 mb-6 flex-1 overflow-y-auto">
+                    <h4 class="text-xl font-semibold text-blue-300 mb-4">Items Sold Summary:</h4>
+                    <div id="report-items-summary">
+                        <!-- Detailed items sold will be rendered here -->
+                    </div>
+                    <p class="text-gray-400 text-center py-8" id="empty-items-summary-message">No items sold in this period.</p>
+                </div>
+
+
+                <button id="download-report-pdf"
+                        class="w-full py-3 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-bold
+                               rounded-lg shadow-lg transform transition duration-200 hover:scale-105 mt-6
+                               focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-gray-800">
+                    Download Report (PDF)
+                </button>
+            </div>
         </div>
 
         <!-- Right Sidebar: Cart & Totals -->
         <div id="right-sidebar">
-            <h1 class="text-3xl font-bold text-white mb-6 text-center">Customer Cart</h1>
+            <h1 class="text-3xl font-bold text-white mb-6 text-center">Cart List</h1>
 
             <!-- Cart Items List -->
             <div id="cart-list" class="flex-1 overflow-y-auto pr-2 mb-6">
@@ -278,15 +336,12 @@
             <div class="border-t border-gray-700 pt-6">
                 <div class="flex justify-between items-center mb-2">
                     <span class="text-lg text-gray-300">Subtotal:</span>
-                    <span id="subtotal" class="text-xl font-semibold text-white">$0.00</span>
+                    <span id="subtotal" class="text-xl font-semibold text-white">₱0.00</span>
                 </div>
-                <div class="flex justify-between items-center mb-2">
-                    <span class="text-lg text-gray-300">Tax (10%):</span>
-                    <span id="tax" class="text-xl font-semibold text-white">$0.00</span>
-                </div>
+                <!-- Tax (10%) div removed -->
                 <div class="flex justify-between items-center mb-4">
                     <span class="text-2xl font-bold text-blue-400">Total:</span>
-                    <span id="total" class="text-3xl font-extrabold text-blue-300">$0.00</span>
+                    <span id="total" class="text-3xl font-extrabold text-blue-300">₱0.00</span>
                 </div>
 
                 <!-- Checkout Button -->
@@ -312,7 +367,7 @@
         </div>
     </div>
 
-    <!-- Manage Products Modal -->
+    <!-- Manage Products Modal (for Add/Restock) -->
     <div id="manage-product-modal-container" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-40">
         <div class="bg-gray-800 p-6 rounded-lg shadow-xl border border-gray-700 w-full max-w-2xl h-5/6 flex flex-col">
             <div class="flex justify-between items-center border-b border-gray-700 pb-4 mb-4">
@@ -339,7 +394,7 @@
                                   focus:outline-none focus:ring-2 focus:ring-blue-600 transition duration-200">
                 </div>
                 <div class="mb-4">
-                    <label for="modal-new-product-price" class="block text-gray-300 text-sm font-bold mb-2">Price ($):</label>
+                    <label for="modal-new-product-price" class="block text-gray-300 text-sm font-bold mb-2">Price (₱):</label>
                     <input type="number" id="modal-new-product-price" step="0.01" min="0"
                            class="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 placeholder-gray-500
                                   focus:outline-none focus:ring-2 focus:ring-blue-600 transition duration-200">
@@ -372,7 +427,7 @@
                 </button>
             </div>
 
-            <div id="modal-restock-product-content" class="modal-tab-content hidden flex-1 flex flex-col overflow-y-auto pr-2">
+            <div id="modal-restock-product-content" class="modal-tab-content hidden flex-1 flex-col overflow-y-auto pr-2">
                 <h3 class="text-xl font-bold text-white mb-4 text-center">Restock Products</h3>
                 <!-- Restock Search Bar -->
                 <div class="mb-6">
@@ -392,6 +447,61 @@
             </div>
         </div>
     </div>
+
+    <!-- Edit Product Details Modal -->
+    <div id="edit-product-details-modal-container" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50">
+        <div class="bg-gray-800 p-6 rounded-lg shadow-xl border border-gray-700 w-full max-w-lg flex flex-col">
+            <div class="flex justify-between items-center border-b border-gray-700 pb-4 mb-4">
+                <h2 class="text-2xl font-bold text-white">Edit Product</h2>
+                <button id="edit-product-details-modal-close-btn"
+                        class="text-gray-400 hover:text-white text-3xl leading-none font-semibold">
+                    &times;
+                </button>
+            </div>
+
+            <div class="flex-1 flex flex-col overflow-y-auto pr-2">
+                <div class="mb-4">
+                    <label for="edit-product-name" class="block text-gray-300 text-sm font-bold mb-2">Product Name:</label>
+                    <input type="text" id="edit-product-name"
+                           class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-gray-200 placeholder-gray-500
+                                  focus:outline-none focus:ring-2 focus:ring-blue-600 transition duration-200">
+                </div>
+                <div class="mb-4">
+                    <label for="edit-product-price" class="block text-gray-300 text-sm font-bold mb-2">Price (₱):</label>
+                    <input type="number" id="edit-product-price" step="0.01" min="0"
+                           class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-gray-200 placeholder-gray-500
+                                  focus:outline-none focus:ring-2 focus:ring-blue-600 transition duration-200">
+                </div>
+                <div class="mb-4">
+                    <label for="edit-product-stock" class="block text-gray-300 text-sm font-bold mb-2">Current Stock:</label>
+                    <input type="number" id="edit-product-stock" min="0"
+                           class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-gray-200 placeholder-gray-500
+                                  focus:outline-none focus:ring-2 focus:ring-blue-600 transition duration-200">
+                </div>
+                <div class="mb-6">
+                    <label for="edit-product-restock-level" class="block text-gray-300 text-sm font-bold mb-2">Restock Level:</label>
+                    <input type="number" id="edit-product-restock-level" min="0"
+                           class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-gray-200 placeholder-gray-500
+                                  focus:outline-none focus:ring-2 focus:ring-blue-600 transition duration-200">
+                </div>
+                <div class="mb-6">
+                    <label for="edit-product-image" class="block text-gray-300 text-sm font-bold mb-2">Product Image:</label>
+                    <input type="file" id="edit-product-image" accept="image/*"
+                           class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-gray-200 placeholder-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer">
+                    <div class="mt-4 flex justify-center">
+                        <img id="edit-image-preview" class="max-w-full max-h-48 rounded-md border border-gray-700 object-contain hidden" alt="Image Preview">
+                    </div>
+                </div>
+                <button id="edit-product-save-btn"
+                        class="w-full py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold
+                               rounded-lg shadow-lg transform transition duration-200 hover:scale-105
+                               focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800">
+                    Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+
 
     <!-- Sale Summary Modal -->
     <div id="sale-summary-modal-container" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-40">
@@ -436,15 +546,12 @@
             <div class="border-t border-gray-700 pt-6">
                 <div class="flex justify-between items-center mb-2">
                     <span class="text-lg text-gray-300">Subtotal:</span>
-                    <span id="summary-subtotal" class="text-xl font-semibold text-white">$0.00</span>
+                    <span id="summary-subtotal" class="text-xl font-semibold text-white">₱0.00</span>
                 </div>
-                <div class="flex justify-between items-center mb-2">
-                    <span class="text-lg text-gray-300">Tax (10%):</span>
-                    <span id="summary-tax" class="text-xl font-semibold text-white">$0.00</span>
-                </div>
+                <!-- Tax div removed from summary modal -->
                 <div class="flex justify-between items-center mb-4">
                     <span class="text-2xl font-bold text-blue-400">Total:</span>
-                    <span id="summary-total" class="text-3xl font-extrabold text-blue-300">$0.00</span>
+                    <span id="summary-total" class="text-3xl font-extrabold text-blue-300">₱0.00</span>
                 </div>
 
                 <div class="flex justify-end space-x-3">
@@ -460,52 +567,52 @@
         </div>
     </div>
 
-    <!-- Receipt Modal - This modal's content will be copied to a new window for printing -->
-    <div id="receipt-modal-container" class="hidden">
-        <div id="receipt-modal-content" class="bg-white text-gray-900 p-8 rounded-lg shadow-xl w-full max-w-sm flex flex-col">
+    <!-- Receipt Modal - This will now be a main app modal, not just a hidden template -->
+    <div id="receipt-modal-container" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50">
+        <div id="receipt-modal-content" class="bg-gray-800 text-gray-900 p-8 rounded-lg shadow-xl border border-gray-700 w-full max-w-sm flex flex-col">
             <div id="receipt-header" class="text-center mb-6">
-                <h2 class="text-2xl font-extrabold text-gray-900 mb-2">MotorShop Receipt</h2>
-                <p class="text-sm text-gray-600">Date: <span id="receipt-date"></span></p>
-                <p class="text-sm text-gray-600">Time: <span id="receipt-time"></span></p>
+                <h2 class="text-2xl font-extrabold text-white mb-2">Garahe ni Hulyo Receipt</h2>
+                <p class="text-sm text-gray-400">Invoice ID: <span id="receipt-invoice-id"></span></p>
+                <p class="text-sm text-gray-400">Date: <span id="receipt-date"></span></p>
+                <p class="text-sm text-gray-400">Time: <span id="receipt-time"></span></p>
             </div>
 
-            <div id="receipt-customer-info" class="mb-6 border-b border-gray-300 pb-4">
-                <h3 class="text-lg font-bold text-gray-800 mb-2">Customer Details:</h3>
+            <div id="receipt-customer-info" class="mb-6 border-b border-gray-700 pb-4 text-gray-200">
+                <h3 class="text-lg font-bold text-blue-300 mb-2">Customer Details:</h3>
                 <p><strong>Name:</strong> <span id="receipt-customer-name"></span></p>
                 <p><strong>Address:</strong> <span id="receipt-customer-address"></span></p>
                 <p><strong>Contact:</strong> <span id="receipt-customer-contact"></span></p>
             </div>
 
-            <div id="receipt-items-list" class="flex-1 overflow-y-auto mb-6 border-b border-gray-300 pb-4">
-                <h3 class="text-lg font-bold text-gray-800 mb-2">Items:</h3>
+            <div id="receipt-items-list" class="flex-1 overflow-y-auto mb-6 border-b border-gray-700 pb-4 text-gray-200">
+                <h3 class="text-lg font-bold text-blue-300 mb-2">Items:</h3>
                 <!-- Receipt items will be rendered here -->
             </div>
 
             <div id="receipt-totals" class="mb-6">
-                <div class="flex justify-between text-lg mb-1">
+                <div class="flex justify-between text-lg mb-1 text-gray-300">
                     <span>Subtotal:</span>
-                    <span id="receipt-subtotal" class="font-semibold"></span>
+                    <span id="receipt-subtotal" class="font-semibold text-white"></span>
                 </div>
-                <div class="flex justify-between text-lg mb-1">
-                    <span>Tax:</span>
-                    <span id="receipt-tax" class="font-semibold"></span>
-                </div>
-                <div class="flex justify-between text-xl font-bold mt-2">
+                <!-- Tax div removed from receipt -->
+                <div class="flex justify-between text-xl font-bold mt-2 text-blue-400">
                     <span>Total:</span>
-                    <span id="receipt-total"></span>
+                    <span id="receipt-total" class="text-white"></span>
                 </div>
             </div>
 
-            <div class="text-center text-sm text-gray-600 mb-6">
+            <div class="text-center text-sm text-gray-400 mb-6">
                 <p>Thank you for your purchase!</p>
-                <p>MotorShop - Your Go-To for Motorcycle Parts</p>
+                <p>Garahe ni Hulyo - Your Go-To for Motorcycle Parts</p>
             </div>
 
-            <!-- These buttons will be hidden by print-specific CSS in the new window -->
-            <div class="flex justify-end space-x-3 print-hidden">
-                <button id="receipt-print-btn" class="px-5 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 transition duration-200">Print</button>
-                <button id="receipt-new-sale-btn" class="px-5 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-200">New Sale</button>
+            <!-- Buttons for decision - KEPT VISIBLE IN MODAL -->
+            <div class="flex justify-end space-x-3">
+                <button id="receipt-print-btn" class="px-5 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-200 font-bold">Print</button>
+                <button id="receipt-new-sale-btn" class="px-5 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 transition duration-200">New Sale</button>
             </div>
+             <!-- Dedicated Close button for the modal -->
+             <button id="receipt-close-btn" class="px-5 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-200 font-bold self-end mt-4">Close Receipt</button>
         </div>
     </div>
 
@@ -521,93 +628,37 @@
         let cart = []; // Still in-memory for current transaction
         let salesLogs = []; // Fetched from Firestore
 
-        const TAX_RATE = 0.10;
+        const TAX_RATE = 0; // Changed to 0 as per request
         let productCounter = 1; // Will be determined by existing Firestore product IDs
         let salesInvoiceCounter = 1001; // Will be determined by existing Firestore sales log IDs
+        let currentReportFilter = 'daily'; // Default filter for sales report
 
-        // --- DOM Elements ---
-        const inventoryListEl = document.getElementById('inventory-list');
-        const cartListEl = document.getElementById('cart-list');
-        const emptyCartMessageEl = document.getElementById('empty-cart-message');
-        const subtotalEl = document.getElementById('subtotal');
-        const taxEl = document.getElementById('tax');
-        const totalEl = document.getElementById('total');
-        const inventorySearchEl = document.getElementById('inventory-search');
-        const checkoutButtonEl = document.getElementById('checkout-button');
-
-        // Main Tab Navigation Elements
-        const tabInventoryBtn = document.getElementById('tab-inventory');
-        const tabManageProductsBtn = document.getElementById('tab-manage-products');
-        const tabReportLogsBtn = document.getElementById('tab-report-logs'); // New Reports button
-
-        const inventoryContentEl = document.getElementById('inventory-content');
-        const reportLogsContentEl = document.getElementById('report-logs-content'); // New Reports content area
-        const salesLogListEl = document.getElementById('sales-log-list');
-        const emptyLogsMessageEl = document.getElementById('empty-logs-message');
-        const inventoryLoadingEl = document.getElementById('inventory-loading'); // Loading indicator
-        const salesLogLoadingEl = document.getElementById('sales-log-loading'); // Loading indicator
-        const userIdDisplayEl = document.getElementById('user-id-display');
-
-        // Message Box Elements
-        const messageBoxContainerEl = document.getElementById('message-box-container');
-        const messageBoxTitleEl = document.getElementById('message-box-title');
-        const messageBoxTextEl = document.getElementById('message-box-text');
-        const messageBoxOkBtn = document.getElementById('message-box-ok');
-        const messageBoxCancelBtn = document.getElementById('message-box-cancel');
-
-        // Manage Products Modal Elements
-        const manageProductModalContainer = document.getElementById('manage-product-modal-container');
-        const manageProductModalCloseBtn = document.getElementById('manage-product-modal-close-btn');
-
-        // Modal Tab Navigation Elements
-        const modalTabAddProductBtn = document.getElementById('modal-tab-add-product');
-        const modalTabRestockProductBtn = document.getElementById('modal-tab-restock-product');
-
-        // Modal Content Areas
-        const modalAddProductContent = document.getElementById('modal-add-product-content');
-        const modalRestockProductContent = document.getElementById('modal-restock-product-content');
-
-        // Add Product Form Elements (inside modal)
-        const modalNewProductNameEl = document.getElementById('modal-new-product-name');
-        const modalNewProductPriceEl = document.getElementById('modal-new-product-price');
-        const modalNewProductStockEl = document.getElementById('modal-new-product-stock');
-        const modalNewProductRestockLevelEl = document.getElementById('modal-new-product-restock-level');
-        const modalNewProductImageEl = document.getElementById('modal-new-product-image');
-        const modalImagePreviewEl = document.getElementById('modal-image-preview');
-        const modalAddProductBtn = document.getElementById('modal-add-product-btn');
-
-        // Restock Product Elements (inside modal)
-        const modalRestockSearchEl = document.getElementById('modal-restock-search');
-        const modalRestockListEl = document.getElementById('modal-restock-list');
-        const modalApplyRestockBtn = document.getElementById('modal-apply-restock-btn');
-
-        // Sale Summary Modal Elements
-        const saleSummaryModalContainer = document.getElementById('sale-summary-modal-container');
-        const saleSummaryModalCloseBtn = document.getElementById('sale-summary-modal-close-btn');
-        const customerNameEl = document.getElementById('customer-name');
-        const customerAddressEl = document.getElementById('customer-address');
-        const customerContactEl = document.getElementById('customer-contact');
-        const saleSummaryItemsListEl = document.getElementById('sale-summary-items-list');
-        const summarySubtotalEl = document.getElementById('summary-subtotal');
-        const summaryTaxEl = document.getElementById('summary-tax');
-        const summaryTotalEl = document.getElementById('summary-total');
-        const saleSummaryCancelBtn = document.getElementById('sale-summary-cancel-btn');
-        const saleSummaryCheckoutBtn = document.getElementById('sale-summary-checkout-btn');
-
-        // Receipt Modal Elements
-        // Note: receipt-modal-container is now effectively just a hidden template
-        const receiptModalContentTemplate = document.getElementById('receipt-modal-content');
+        // --- DOM Elements (Declared with 'let' and assigned inside window.onload) ---
+        let inventoryListEl, cartListEl, emptyCartMessageEl, subtotalEl, totalEl, inventorySearchEl, checkoutButtonEl;
+        let tabInventoryBtn, tabManageProductsBtn, tabInventoryMasterBtn, tabReportLogsBtn, tabSalesReportBtn;
+        let inventoryContentEl, inventoryMasterContentEl, masterListEl, masterListSearchEl, masterListLoadingEl;
+        let reportLogsContentEl, salesLogListEl, emptyLogsMessageEl, inventoryLoadingEl, salesLogLoadingEl, userIdDisplayEl;
+        let messageBoxContainerEl, messageBoxTitleEl, messageBoxTextEl, messageBoxOkBtn, messageBoxCancelBtn;
+        let manageProductModalContainer, manageProductModalCloseBtn;
+        let modalTabAddProductBtn, modalTabRestockProductBtn;
+        let modalAddProductContent, modalRestockProductContent;
+        let modalNewProductNameEl, modalNewProductPriceEl, modalNewProductStockEl, modalNewProductRestockLevelEl, modalNewProductImageEl, modalImagePreviewEl, modalAddProductBtn;
+        let modalRestockSearchEl, modalRestockListEl, modalApplyRestockBtn;
+        let editProductDetailsModalContainer, editProductDetailsModalCloseBtn, editProductNameEl, editProductPriceEl, editProductStockEl, editProductRestockLevelEl, editProductImageEl, editImagePreviewEl, editProductSaveBtn;
+        let saleSummaryModalContainer, saleSummaryModalCloseBtn, customerNameEl, customerAddressEl, customerContactEl, saleSummaryItemsListEl, summarySubtotalEl, summaryTotalEl, saleSummaryCancelBtn, saleSummaryCheckoutBtn;
+        let receiptModalContainer, receiptModalContentTemplate, activeReceiptPrintBtn, activeReceiptNewSaleBtn, receiptCloseBtn;
+        let salesReportContentEl, filterDailyBtn, filterWeeklyBtn, filterMonthlyBtn, reportTotalSalesEl, reportPeriodInfoEl, reportDetailsListEl, emptyReportMessageEl, emptyItemsSummaryMessageEl, downloadReportPdfBtn, reportItemsSummaryEl;
 
 
         // --- Helper Functions ---
 
         /**
-         * Formats a number as a currency string.
+         * Formats a number as a currency string (PHP).
          * @param {number} amount
          * @returns {string} Formatted currency string.
          */
         function formatCurrency(amount) {
-            return `$${amount.toFixed(2)}`;
+            return `₱${amount.toFixed(2)}`; // Changed to PHP symbol
         }
 
         /**
@@ -779,6 +830,82 @@
         }
 
         /**
+         * Renders the inventory master list for editing and deletion.
+         * @param {Array<Object>} items - The list of inventory items to display.
+         */
+        function renderMasterList(items = inventory) {
+            masterListEl.innerHTML = ''; // Clear existing items
+
+            const searchTerm = masterListSearchEl.value.toLowerCase().trim();
+            const filteredItems = items.filter(item =>
+                item.name.toLowerCase().includes(searchTerm)
+            );
+
+            if (filteredItems.length === 0) {
+                masterListEl.innerHTML = `
+                    <p class="text-gray-400 text-center py-8">No inventory items found matching your search.</p>
+                `;
+                return;
+            }
+
+            // Sort items alphabetically by name
+            const sortedItems = [...filteredItems].sort((a, b) => a.name.localeCompare(b.name));
+
+            sortedItems.forEach(item => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = `
+                    bg-gray-800 rounded-lg p-4 mb-4 shadow-md border border-gray-700
+                    flex flex-col sm:flex-row justify-between items-center transition-all duration-200
+                    hover:scale-[1.01] hover:bg-gray-700
+                `;
+                itemDiv.innerHTML = `
+                    <div class="flex items-center gap-4 text-left mb-3 sm:mb-0">
+                        <img src="${item.imageUrl || 'https://placehold.co/80x80/555555/EEEEEE?text=No+Img'}"
+                             onerror="this.onerror=null;this.src='https://placehold.co/80x80/555555/EEEEEE?text=No+Img';"
+                             alt="${item.name}" class="w-20 h-20 rounded-md object-cover border border-gray-600">
+                        <div>
+                            <h3 class="text-xl font-semibold text-blue-300">${item.name}</h3>
+                            <p class="text-gray-400">Price: <span class="font-medium text-gray-200">${formatCurrency(item.price)}</span></p>
+                            <p class="text-gray-400">Stock: <span class="font-medium text-gray-200">${item.stock}</span></p>
+                            <p class="text-gray-400">Restock Level: <span class="font-medium text-gray-200">${item.restockLevel || 'N/A'}</span></p>
+                        </div>
+                    </div>
+                    <div class="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-3">
+                        <button data-item-id="${item.id}"
+                                class="edit-item-btn px-4 py-2 bg-yellow-600 text-white rounded-lg
+                                       hover:bg-yellow-700 active:bg-yellow-800 transition duration-200
+                                       shadow-md text-sm sm:text-base">
+                            Edit
+                        </button>
+                        <button data-item-id="${item.id}"
+                                class="delete-item-btn px-4 py-2 bg-red-600 text-white rounded-lg
+                                       hover:bg-red-700 active:bg-red-800 transition duration-200
+                                       shadow-md text-sm sm:text-base">
+                            Delete
+                        </button>
+                    </div>
+                `;
+                masterListEl.appendChild(itemDiv);
+            });
+
+            // Add event listeners for "Edit" and "Delete" buttons
+            document.querySelectorAll('.edit-item-btn').forEach(button => {
+                button.addEventListener('click', (event) => {
+                    const itemId = event.target.dataset.itemId;
+                    openEditProductDetailsModal(itemId);
+                });
+            });
+
+            document.querySelectorAll('.delete-item-btn').forEach(button => {
+                button.addEventListener('click', (event) => {
+                    const itemId = event.target.dataset.itemId;
+                    deleteProduct(itemId);
+                });
+            });
+        }
+
+
+        /**
          * Renders the restock list in the "Restock Product" tab within the modal.
          * @param {Array<Object>} items - The list of inventory items to display for restock.
          */
@@ -899,7 +1026,7 @@
                     const invoiceId = event.target.dataset.invoiceId;
                     const selectedLog = salesLogs.find(log => log.salesInvoiceId === invoiceId);
                     if (selectedLog) {
-                        openReceiptForPrinting(selectedLog); // Pass the entire log object
+                        displayReceiptModal(selectedLog); // Display the receipt in the main app modal
                     } else {
                         showMessageBox('Error', 'Sales record not found.');
                     }
@@ -909,12 +1036,13 @@
 
 
         /**
-         * Renders the receipt details into the hidden template.
+         * Renders the receipt details into the displayed modal.
          * @param {Object} saleData - The sale data to render (can be currentSale or a historical salesLog).
          */
-        function renderReceipt(saleData) {
-            // Populate the hidden receipt modal content template
+        function renderReceiptContent(saleData) {
+            // Populate the receipt modal content template (receiptModalContentTemplate is the div itself)
             const saleDateTime = new Date(saleData.timestamp);
+            receiptModalContentTemplate.querySelector('#receipt-invoice-id').textContent = saleData.salesInvoiceId || 'N/A';
             receiptModalContentTemplate.querySelector('#receipt-date').textContent = saleDateTime.toLocaleDateString();
             receiptModalContentTemplate.querySelector('#receipt-time').textContent = saleDateTime.toLocaleTimeString();
 
@@ -923,21 +1051,21 @@
             receiptModalContentTemplate.querySelector('#receipt-customer-contact').textContent = saleData.customer.contact || 'N/A';
 
             const receiptItemsListEl = receiptModalContentTemplate.querySelector('#receipt-items-list');
-            receiptItemsListEl.innerHTML = '<h3 class="text-lg font-bold text-gray-800 mb-2">Items:</h3>'; // Clear and add heading
+            receiptItemsListEl.innerHTML = '<h3 class="text-lg font-bold text-blue-300 mb-2">Items:</h3>'; // Clear and add heading
             saleData.items.forEach(item => {
                 const itemDiv = document.createElement('div');
                 itemDiv.className = `
-                    flex justify-between items-center py-1 border-b border-gray-200 last:border-b-0
+                    flex justify-between items-center py-1 border-b border-gray-700 last:border-b-0
                 `;
                 itemDiv.innerHTML = `
-                    <span class="text-gray-700">${item.name} x ${item.quantity}</span>
-                    <span class="font-semibold text-gray-800">${formatCurrency(item.price * item.quantity)}</span>
+                    <span class="text-gray-200">${item.name} x ${item.quantity}</span>
+                    <span class="font-semibold text-white">${formatCurrency(item.price * item.quantity)}</span>
                 `;
                 receiptItemsListEl.appendChild(itemDiv);
             });
 
             receiptModalContentTemplate.querySelector('#receipt-subtotal').textContent = formatCurrency(saleData.subtotal);
-            receiptModalContentTemplate.querySelector('#receipt-tax').textContent = formatCurrency(saleData.tax);
+            // Removed tax line from receipt rendering
             receiptModalContentTemplate.querySelector('#receipt-total').textContent = formatCurrency(saleData.total);
         }
 
@@ -951,16 +1079,16 @@
                 subtotal += item.price * item.quantity;
             });
 
-            const tax = subtotal * TAX_RATE;
+            const tax = subtotal * TAX_RATE; // TAX_RATE is now 0
             const total = subtotal + tax;
 
             subtotalEl.textContent = formatCurrency(subtotal);
-            taxEl.textContent = formatCurrency(tax);
+            // taxEl.textContent = formatCurrency(tax); // This will now always be ₱0.00 - REMOVED
             totalEl.textContent = formatCurrency(total);
 
             // Also update summary modal totals
             summarySubtotalEl.textContent = formatCurrency(subtotal);
-            summaryTaxEl.textContent = formatCurrency(tax);
+            // summaryTaxEl.textContent = formatCurrency(tax); // This will now always be ₱0.00 - REMOVED
             summaryTotalEl.textContent = formatCurrency(total);
         }
 
@@ -977,7 +1105,8 @@
                 return;
             }
             try {
-                const itemDocRef = firebase.doc(db, `artifacts/${FIREBASE_PROJECT_ID}/public/data/inventory`, itemId);
+                // Use currentAppId for the Firestore path
+                const itemDocRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/inventory`, itemId);
                 const itemDocSnap = await firebase.getDoc(itemDocRef);
 
                 if (!itemDocSnap.exists()) {
@@ -1040,7 +1169,7 @@
                 const originalCartQuantity = cartItem.quantity;
 
                 // Fetch the current inventory stock from Firestore to ensure accuracy
-                const itemDocRef = firebase.doc(db, `artifacts/${FIREBASE_PROJECT_ID}/public/data/inventory`, itemId);
+                const itemDocRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/inventory`, itemId);
                 const itemDocSnap = await firebase.getDoc(itemDocRef);
                 if (!itemDocSnap.exists()) {
                     showMessageBox('Error', 'Item not found in inventory for quantity update.');
@@ -1062,7 +1191,7 @@
 
                 if (quantityToSet > maxAvailableForCart) {
                     quantityToSet = maxAvailableForCart; // Don't allow buying more than total available stock
-                    showMessageBox('Stock Limit Reached', `Only ${maxAvailableForCart} of ${inventoryItem.name} can be added to your cart.`);
+                    showMessageBox('Stock Limit Reached', `You have added all available ${inventoryItem.name} items to your cart.`);
                 }
 
                 // If the quantity hasn't actually changed after validation, do nothing
@@ -1113,7 +1242,8 @@
                 const itemIndex = cart.findIndex(item => item.id === itemId);
                 if (itemIndex > -1) {
                     const removedItem = cart[itemIndex];
-                    const itemDocRef = firebase.doc(db, `artifacts/${FIREBASE_PROJECT_ID}/public/data/inventory`, itemId);
+                    // Use currentAppId for the Firestore path
+                    const itemDocRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/inventory`, itemId);
                     const itemDocSnap = await firebase.getDoc(itemDocRef);
                     if (itemDocSnap.exists()) {
                         const inventoryItem = { id: itemDocSnap.id, ...itemDocSnap.data() };
@@ -1123,7 +1253,8 @@
                     cart.splice(itemIndex, 1); // Remove item from local cart array
                 }
                 renderCart();
-            } catch (error) {
+            }
+            catch (error) {
                 console.error("Error removing item from cart:", error);
                 showMessageBox('Error', 'Failed to remove item from cart. Please try again.');
             }
@@ -1149,6 +1280,20 @@
             const searchTerm = inventorySearchEl.value.toLowerCase().trim();
             if (!searchTerm) {
                 return inventory; // `inventory` is now kept in sync by Firestore listener
+            }
+            return inventory.filter(item =>
+                item.name.toLowerCase().includes(searchTerm)
+            );
+        }
+
+        /**
+         * Filters the master list based on the search input.
+         * @returns {Array<Object>} Filtered master list items.
+         */
+        function getFilteredMasterList() {
+            const searchTerm = masterListSearchEl.value.toLowerCase().trim();
+            if (!searchTerm) {
+                return inventory;
             }
             return inventory.filter(item =>
                 item.name.toLowerCase().includes(searchTerm)
@@ -1204,7 +1349,8 @@
 
             try {
                 // Add the new product to Firestore with the generated ID as document ID
-                const docRef = firebase.doc(db, `artifacts/${FIREBASE_PROJECT_ID}/public/data/inventory`, newProductId);
+                // Use currentAppId for the Firestore path
+                const docRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/inventory`, newProductId);
                 await firebase.setDoc(docRef, newProductData);
 
                 modalNewProductNameEl.value = '';
@@ -1241,7 +1387,8 @@
                 const inventoryItem = inventory.find(item => item.id === itemId);
 
                 if (inventoryItem && !isNaN(quantity) && quantity > 0) {
-                    const itemDocRef = firebase.doc(db, `artifacts/${FIREBASE_PROJECT_ID}/public/data/inventory`, itemId);
+                    // Use currentAppId for the Firestore path
+                    const itemDocRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/inventory`, itemId);
                     updates.push(firebase.updateDoc(itemDocRef, { stock: inventoryItem.stock + quantity }));
                     restockedCount++;
                     totalRestockedUnits += quantity;
@@ -1263,36 +1410,192 @@
             }
         }
 
+        /**
+         * Opens the modal to edit a specific product's details.
+         * @param {string} itemId - The ID of the product to edit.
+         */
+        function openEditProductDetailsModal(itemId) {
+            const itemToEdit = inventory.find(item => item.id === itemId);
+
+            if (!itemToEdit) {
+                showMessageBox('Error', 'Product not found for editing.');
+                return;
+            }
+
+            // Populate form fields
+            editProductNameEl.value = itemToEdit.name;
+            editProductPriceEl.value = itemToEdit.price;
+            editProductStockEl.value = itemToEdit.stock;
+            editProductRestockLevelEl.value = itemToEdit.restockLevel || '';
+            editProductImageEl.value = ''; // Clear file input as it's for new file upload
+
+            // Display current image or a placeholder
+            if (itemToEdit.imageUrl) {
+                editImagePreviewEl.src = itemToEdit.imageUrl;
+                editImagePreviewEl.classList.remove('hidden');
+            } else {
+                editImagePreviewEl.src = '';
+                editImagePreviewEl.classList.add('hidden');
+            }
+
+            // Store the ID of the item being edited on the save button
+            editProductSaveBtn.dataset.editingItemId = itemId;
+
+            // Show the modal
+            editProductDetailsModalContainer.classList.remove('hidden');
+        }
+
+        /**
+         * Closes the edit product details modal.
+         */
+        function closeEditProductDetailsModal() {
+            editProductDetailsModalContainer.classList.add('hidden');
+            // Clear fields and data attribute
+            editProductNameEl.value = '';
+            editProductPriceEl.value = '';
+            editProductStockEl.value = '';
+            editProductRestockLevelEl.value = '';
+            editProductImageEl.value = '';
+            editImagePreviewEl.src = '';
+            editImagePreviewEl.classList.add('hidden');
+            delete editProductSaveBtn.dataset.editingItemId; // Remove the stored ID
+        }
+
+        /**
+         * Saves the edited product details to Firestore.
+         */
+        async function saveEditedProduct() {
+            if (!isFirebaseReady) {
+                showMessageBox('Loading', 'Please wait while the system is initializing...');
+                return;
+            }
+
+            const itemId = editProductSaveBtn.dataset.editingItemId;
+            if (!itemId) {
+                showMessageBox('Error', 'No product selected for editing.');
+                return;
+            }
+
+            const name = editProductNameEl.value.trim();
+            const price = parseFloat(editProductPriceEl.value);
+            const stock = parseInt(editProductStockEl.value);
+            const restockLevel = parseInt(editProductRestockLevelEl.value);
+
+            if (!name || isNaN(price) || price <= 0 || isNaN(stock) || stock < 0 || isNaN(restockLevel) || restockLevel < 0) {
+                showMessageBox('Input Error', 'Please enter valid product name, price (>0), stock (>=0), and restock level (>=0).');
+                return;
+            }
+
+            let imageUrl = inventory.find(item => item.id === itemId)?.imageUrl || ''; // Keep existing image if not changed
+            if (editProductImageEl.files.length > 0) {
+                const file = editProductImageEl.files[0];
+                try {
+                    imageUrl = await new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve(reader.result);
+                        reader.onerror = error => reject(error);
+                        reader.readAsDataURL(file);
+                    });
+                } catch (error) {
+                    console.error("Error reading new image file:", error);
+                    showMessageBox('Image Error', 'Could not read new image file. Please try again.');
+                    return;
+                }
+            }
+
+            const updatedProductData = {
+                name: name,
+                price: price,
+                stock: stock,
+                restockLevel: restockLevel,
+                imageUrl: imageUrl
+            };
+
+            try {
+                // Use currentAppId for the Firestore path
+                const docRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/inventory`, itemId);
+                await firebase.updateDoc(docRef, updatedProductData);
+
+                showMessageBox('Success', `${name} updated successfully.`);
+                closeEditProductDetailsModal();
+            } catch (error) {
+                console.error("Error updating product:", error);
+                showMessageBox('Error', 'Failed to update product. Please try again.');
+            }
+        }
+
+        /**
+         * Deletes a product from Firestore.
+         * @param {string} itemId - The ID of the product to delete.
+         */
+        async function deleteProduct(itemId) {
+            if (!isFirebaseReady) {
+                showMessageBox('Loading', 'Please wait while the system is initializing...');
+                return;
+            }
+
+            const itemToDelete = inventory.find(item => item.id === itemId);
+            const confirmed = await showMessageBox(
+                'Confirm Deletion',
+                `Are you sure you want to delete "${itemToDelete ? itemToDelete.name : 'this item'}"? This action cannot be undone.`,
+                true
+            );
+
+            if (confirmed) {
+                try {
+                    // Use currentAppId for the Firestore path
+                    const docRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/inventory`, itemId);
+                    await firebase.deleteDoc(docRef);
+                    showMessageBox('Success', 'Product deleted successfully.');
+                } catch (error) {
+                    console.error("Error deleting product:", error);
+                    showMessageBox('Error', 'Failed to delete product. Please try again.');
+                }
+            }
+        }
+
 
         // --- Main Tab Switching Logic ---
 
         /**
          * Switches the active main tab and displays the corresponding content.
-         * @param {string} tabName - The name of the tab to activate ('inventory', 'manage-products', 'report-logs').
+         * @param {string} tabName - The name of the tab to activate ('inventory', 'manage-products', 'inventory-master', 'report-logs', 'sales-report').
          */
         function switchMainTab(tabName) {
             // Hide all main content divs
             inventoryContentEl.classList.add('hidden');
-            reportLogsContentEl.classList.add('hidden'); // Hide report logs
+            inventoryMasterContentEl.classList.add('hidden'); // Hide master list
+            reportLogsContentEl.classList.add('hidden');
+            salesReportContentEl.classList.add('hidden'); // Hide sales report content
 
             // Deactivate all main tab buttons
             tabInventoryBtn.classList.remove('active');
             tabManageProductsBtn.classList.remove('active');
-            tabReportLogsBtn.classList.remove('active'); // Deactivate report logs button
+            tabInventoryMasterBtn.classList.remove('active'); // Deactivate master list button
+            tabReportLogsBtn.classList.remove('active');
+            tabSalesReportBtn.classList.remove('active'); // Deactivate sales report button
 
             // Show relevant content and activate relevant button
             if (tabName === 'inventory') {
                 inventoryContentEl.classList.remove('hidden');
                 tabInventoryBtn.classList.add('active');
-                // Inventory rendering is handled by the onSnapshot listener
             } else if (tabName === 'manage-products') {
-                // Do not show a content div here, instead open the modal
                 tabManageProductsBtn.classList.add('active');
-                openManageProductModal();
+                openManageProductModal(); // Open the modal for add/restock
+            } else if (tabName === 'inventory-master') { // New case for Master List
+                inventoryMasterContentEl.classList.remove('hidden');
+                tabInventoryMasterBtn.classList.add('active');
+                renderMasterList(getFilteredMasterList()); // Render and filter master list
             } else if (tabName === 'report-logs') {
-                reportLogsContentEl.classList.remove('hidden'); // Show report logs
-                tabReportLogsBtn.classList.add('active'); // Activate report logs button
-                // Sales log rendering is handled by the onSnapshot listener
+                reportLogsContentEl.classList.remove('hidden');
+                tabReportLogsBtn.classList.add('active');
+            } else if (tabName === 'sales-report') {
+                salesReportContentEl.classList.remove('hidden');
+                tabSalesReportBtn.classList.add('active');
+                // Ensure correct filter is active on tab switch
+                document.querySelectorAll('#sales-report-content button').forEach(btn => btn.classList.remove('active'));
+                document.getElementById(`filter-${currentReportFilter}`).classList.add('active');
+                renderSalesReport(); // Render sales report
             }
         }
 
@@ -1321,7 +1624,6 @@
 
             // Clear restock search and re-render restock list in case modal is opened again
             modalRestockSearchEl.value = '';
-            // No need to call renderModalRestockList here, it will be called when tab is opened
             switchMainTab('inventory'); // Re-activate the Inventory tab in the main view
         }
 
@@ -1370,6 +1672,170 @@
         }
 
         /**
+         * Displays the receipt in a modal and attaches event listeners for print/new sale.
+         * @param {Object} saleData - The sale data to display.
+         */
+        function displayReceiptModal(saleData) {
+            renderReceiptContent(saleData); // Populate the modal content
+
+            // Show the modal
+            receiptModalContainer.classList.remove('hidden');
+
+            // Get references to the buttons inside the currently displayed modal for events
+            activeReceiptPrintBtn = receiptModalContentTemplate.querySelector('#receipt-print-btn');
+            activeReceiptNewSaleBtn = receiptModalContentTemplate.querySelector('#receipt-new-sale-btn');
+
+            // Remove any existing listeners to prevent duplicates
+            activeReceiptPrintBtn.removeEventListener('click', handlePrintReceipt);
+            activeReceiptNewSaleBtn.removeEventListener('click', handleNewSaleFromReceipt);
+            receiptCloseBtn.removeEventListener('click', closeReceiptModal); // Ensure no duplicate listeners
+
+            // Add new listeners
+            activeReceiptPrintBtn.addEventListener('click', handlePrintReceipt);
+            activeReceiptNewSaleBtn.addEventListener('click', handleNewSaleFromReceipt);
+            receiptCloseBtn.addEventListener('click', closeReceiptModal);
+        }
+
+        /**
+         * Hides the receipt modal.
+         */
+        function closeReceiptModal() {
+            receiptModalContainer.classList.add('hidden');
+            // Important: remove listeners to prevent memory leaks and duplicate calls
+            if (activeReceiptPrintBtn) activeReceiptPrintBtn.removeEventListener('click', handlePrintReceipt);
+            if (activeReceiptNewSaleBtn) activeReceiptNewSaleBtn.removeEventListener('click', handleNewSaleFromReceipt);
+            receiptCloseBtn.removeEventListener('click', closeReceiptModal); // Remove listener for the new dedicated close button
+
+            // After closing the receipt, clear the cart for a new sale
+            cart = [];
+            renderCart();
+            // Switch back to inventory tab
+            switchMainTab('inventory');
+        }
+
+        /**
+         * Handler for the print button within the receipt modal.
+         * Opens a new window with the receipt content and triggers print.
+         */
+        function handlePrintReceipt() {
+            const printWindow = window.open('', '_blank', 'width=800,height=600');
+            if (!printWindow) {
+                showMessageBox('Print Error', 'Please allow pop-ups for this site to print the receipt.');
+                return;
+            }
+
+            // Get the HTML content to be printed from the receipt modal content
+            // We need to clone it and remove the buttons before writing to the print window
+            const tempReceiptContent = receiptModalContentTemplate.cloneNode(true);
+            const buttonsDiv = tempReceiptContent.querySelector('.flex.justify-end.space-x-3');
+            if (buttonsDiv) {
+                buttonsDiv.remove(); // Remove the buttons from the cloned content
+            }
+            // Also remove the standalone close button from the print version
+            const closeButton = tempReceiptContent.querySelector('#receipt-close-btn');
+            if (closeButton) {
+                closeButton.remove();
+            }
+
+            const receiptContentForPrint = tempReceiptContent.innerHTML;
+
+
+            // Construct the HTML for the new print window, including print-specific CSS
+            const printHtml = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Garahe ni Hulyo Receipt</title>
+                    <style>
+                        body {
+                            font-family: 'Inter', sans-serif;
+                            margin: 0;
+                            padding: 20px;
+                            color: #000;
+                            background-color: #fff;
+                            display: flex;
+                            justify-content: center;
+                            align-items: flex-start;
+                            min-height: 100vh;
+                        }
+                        #receipt-content-in-print {
+                            width: 80mm;
+                            max-width: 100%;
+                            padding: 10mm;
+                            box-sizing: border-box;
+                            border: none;
+                            box-shadow: none;
+                            display: block;
+                        }
+                        .text-center { text-align: center; }
+                        .mb-6 { margin-bottom: 1.5rem; }
+                        .mb-2 { margin-bottom: 0.5rem; }
+                        .text-2xl { font-size: 1.5rem; }
+                        .font-extrabold { font-weight: 800; }
+                        .text-gray-900 { color: #1a202c; }
+                        .text-sm { font-size: 0.875rem; }
+                        .text-gray-600 { color: #4a5568; }
+                        .border-b { border-bottom-width: 1px; }
+                        .border-gray-300 { border-color: #e2e8f0; }
+                        .pb-4 { padding-bottom: 1rem; }
+                        .text-lg { font-size: 1.125rem; }
+                        .font-bold { font-weight: 700; }
+                        .text-gray-800 { color: #2d3748; }
+                        p { margin-bottom: 0.5rem; }
+                        .flex { display: flex; }
+                        .justify-between { justify-content: space-between; }
+                        .items-center { align-items: center; }
+                        .py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+                        .font-semibold { font-weight: 600; }
+                        .mt-2 { margin-top: 0.5rem; }
+                        .text-xl { font-size: 1.25rem; }
+                        /* Hide the buttons only in the print view */
+                        .print-hidden { display: none !important; }
+
+                        /* Specific overrides for print readability */
+                        #receipt-content-in-print h2, #receipt-content-in-print h3,
+                        #receipt-content-in-print p, #receipt-content-in-print span,
+                        #receipt-content-in-print strong {
+                            color: #000 !important;
+                        }
+                        #receipt-content-in-print {
+                            background-color: #fff !important;
+                        }
+                        #receipt-content-in-print .border-b, #receipt-content-in-print .border-gray-200, #receipt-content-in-print .border-gray-300 {
+                            border-color: #bbb !important;
+                        }
+                        /* Removed: content: '₱'; rule that caused duplicate peso signs */
+                    </style>
+                </head>
+                <body>
+                    <div id="receipt-content-in-print">
+                        ${receiptContentForPrint}
+                    </div>
+                </body>
+                </html>
+            `;
+
+            printWindow.document.write(printHtml);
+            printWindow.document.close();
+
+            printWindow.onload = () => {
+                printWindow.focus();
+                printWindow.print();
+            };
+        }
+
+        /**
+         * Handler for the "New Sale" button within the receipt modal.
+         */
+        function handleNewSaleFromReceipt() {
+            cart = []; // Clear the cart
+            renderCart(); // Update the cart display
+            closeReceiptModal(); // Close the receipt modal
+            switchMainTab('inventory'); // Optionally switch back to inventory tab
+        }
+
+
+        /**
          * Finalizes the sale and adds it to Firestore sales logs.
          */
         async function finalizeSale() {
@@ -1406,21 +1872,20 @@
                             contact: customerContact
                         },
                         items: JSON.parse(JSON.stringify(cart)), // Deep copy cart items
-                        subtotal: parseFloat(subtotalEl.textContent.replace('$', '')),
-                        tax: parseFloat(taxEl.textContent.replace('$', '')),
-                        total: parseFloat(totalEl.textContent.replace('$', '')),
+                        subtotal: parseFloat(subtotalEl.textContent.replace('₱', '')), // Use ₱ for parsing
+                        tax: 0, // Tax is now always 0
+                        total: parseFloat(totalEl.textContent.replace('₱', '')), // Use ₱ for parsing
                         timestamp: new Date().toISOString() // Store timestamp for sorting and display
                     };
 
                     // Add the completed sale to Firestore
-                    await firebase.addDoc(firebase.collection(db, `artifacts/${FIREBASE_PROJECT_ID}/public/data/salesLogs`), completedSale);
+                    // Use currentAppId for the Firestore path
+                    await firebase.addDoc(firebase.collection(db, `artifacts/${currentAppId}/public/data/salesLogs`), completedSale);
 
-                    // Clear the cart for a new sale
-                    cart = [];
-                    renderCart(); // Update cart display
+                    // Do NOT clear cart immediately. Display receipt first.
+                    closeSaleSummaryModal(); // Close the checkout summary modal
+                    displayReceiptModal(completedSale); // Show the receipt in a modal
 
-                    closeSaleSummaryModal();
-                    openReceiptForPrinting(completedSale); // Pass the completed sale object for printing
                 } catch (error) {
                     console.error("Error finalizing sale or adding to logs:", error);
                     showMessageBox('Error', 'Failed to finalize sale. Please try again.');
@@ -1428,129 +1893,215 @@
             }
         }
 
-        /**
-         * Opens a new window, renders the receipt content into it, and triggers print.
-         * @param {Object} saleData - The sale data (can be currentSale or a historical salesLog) to print.
-         */
-        function openReceiptForPrinting(saleData) {
-            renderReceipt(saleData); // First, update the hidden template with the provided sale data
+        // --- Sales Report Functions ---
 
-            const printWindow = window.open('', '_blank', 'width=800,height=600');
-            if (!printWindow) {
-                showMessageBox('Print Error', 'Please allow pop-ups for this site to print the receipt.');
-                return;
+        /**
+         * Renders the sales report based on the current filter.
+         */
+        function renderSalesReport() {
+            reportItemsSummaryEl.innerHTML = ''; // Clear previous items summary
+            reportDetailsListEl.innerHTML = ''; // Clear previous individual sales logs
+
+            let filteredSales = [];
+            const now = new Date();
+            let periodText = '';
+
+            if (currentReportFilter === 'daily') {
+                periodText = `Today (${now.toLocaleDateString()})`;
+                filteredSales = salesLogs.filter(log => {
+                    const logDate = new Date(log.timestamp);
+                    return logDate.toDateString() === now.toDateString();
+                });
+            } else if (currentReportFilter === 'weekly') {
+                // Get the start of the current week (Sunday)
+                const startOfWeek = new Date(now);
+                startOfWeek.setDate(now.getDate() - now.getDay()); // Sunday
+                startOfWeek.setHours(0, 0, 0, 0);
+
+                // Get the end of the current week (Saturday)
+                const endOfWeek = new Date(startOfWeek);
+                endOfWeek.setDate(startOfWeek.getDate() + 6);
+                endOfWeek.setHours(23, 59, 59, 999);
+
+                periodText = `This Week (${startOfWeek.toLocaleDateString()} - ${endOfWeek.toLocaleDateString()})`;
+                filteredSales = salesLogs.filter(log => {
+                    const logDate = new Date(log.timestamp);
+                    return logDate >= startOfWeek && logDate <= endOfWeek;
+                });
+            } else if (currentReportFilter === 'monthly') {
+                // Get the start of the current month
+                const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+                startOfMonth.setHours(0, 0, 0, 0);
+
+                // Get the end of the current month
+                const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                endOfMonth.setHours(23, 59, 59, 999);
+
+                periodText = `This Month (${startOfMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })})`;
+                filteredSales = salesLogs.filter(log => {
+                    const logDate = new Date(log.timestamp);
+                    return logDate >= startOfMonth && logDate <= endOfMonth;
+                });
             }
 
-            // Get the content of the receipt template
-            const receiptContent = receiptModalContentTemplate.innerHTML;
+            // Calculate total sales for the filtered period
+            const totalSales = filteredSales.reduce((sum, log) => sum + log.total, 0);
+            reportTotalSalesEl.textContent = formatCurrency(totalSales);
+            reportPeriodInfoEl.textContent = periodText;
 
-            // Construct the HTML for the new print window
-            const printHtml = `
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <title>MotorShop Receipt</title>
-                    <style>
-                        body {
-                            font-family: 'Inter', sans-serif;
-                            margin: 0;
-                            padding: 20px;
-                            color: #000; /* Black text for printing */
-                            background-color: #fff; /* White background for printing */
-                            display: flex;
-                            justify-content: center;
-                            align-items: flex-start;
-                            min-height: 100vh;
-                        }
-                        #receipt-content-in-print {
-                            width: 80mm; /* Standard receipt width */
-                            max-width: 100%;
-                            padding: 10mm;
-                            box-sizing: border-box;
-                            border: none;
-                            box-shadow: none;
-                            display: block;
-                        }
-                        .text-center { text-align: center; }
-                        .mb-6 { margin-bottom: 1.5rem; }
-                        .mb-2 { margin-bottom: 0.5rem; }
-                        .text-2xl { font-size: 1.5rem; }
-                        .font-extrabold { font-weight: 800; }
-                        .text-gray-900 { color: #1a202c; }
-                        .text-sm { font-size: 0.875rem; }
-                        .text-gray-600 { color: #4a5568; }
-                        .mb-6 { margin-bottom: 1.5rem; }
-                        .border-b { border-bottom-width: 1px; }
-                        .border-gray-300 { border-color: #e2e8f0; }
-                        .pb-4 { padding-bottom: 1rem; }
-                        .text-lg { font-size: 1.125rem; }
-                        .font-bold { font-weight: 700; }
-                        .text-gray-800 { color: #2d3748; }
-                        p { margin-bottom: 0.5rem; }
-                        .flex { display: flex; }
-                        .justify-between { justify-content: space-between; }
-                        .items-center { align-items: center; }
-                        .py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
-                        .font-semibold { font-weight: 600; }
-                        .mt-2 { margin-top: 0.5rem; }
-                        .text-xl { font-size: 1.25rem; }
-                        .print-hidden { display: none !important; } /* Hide buttons in print view */
+            // Aggregate item sales for the summary
+            const aggregatedItems = {}; // { productId: { name, quantity, totalRevenue } }
+            filteredSales.forEach(log => {
+                log.items.forEach(item => {
+                    if (!aggregatedItems[item.id]) {
+                        aggregatedItems[item.id] = {
+                            name: item.name,
+                            quantity: 0,
+                            totalRevenue: 0
+                        };
+                    }
+                    aggregatedItems[item.id].quantity += item.quantity;
+                    aggregatedItems[item.id].totalRevenue += (item.price * item.quantity);
+                });
+            });
 
-                        /* Specific overrides to ensure black text and white background for print */
-                        #receipt-content-in-print h2, #receipt-content-in-print h3,
-                        #receipt-content-in-print p, #receipt-content-in-print span,
-                        #receipt-content-in-print strong {
-                            color: #000 !important;
-                        }
-                        #receipt-content-in-print {
-                            background-color: #fff !important;
-                        }
-                        #receipt-content-in-print .border-b, #receipt-content-in-print .border-gray-200, #receipt-content-in-print .border-gray-300 {
-                            border-color: #bbb !important; /* Lighter borders for print */
-                        }
-                    </style>
-                </head>
-                <body>
-                    <div id="receipt-content-in-print">
-                        ${receiptContent}
-                    </div>
-                </body>
-                </html>
-            `;
+            const sortedAggregatedItems = Object.values(aggregatedItems).sort((a, b) => b.totalRevenue - a.totalRevenue);
 
-            printWindow.document.write(printHtml);
-            printWindow.document.close(); // Close the document to ensure content is loaded
+            // Display aggregated item summary
+            if (sortedAggregatedItems.length === 0) {
+                emptyItemsSummaryMessageEl.classList.remove('hidden');
+            } else {
+                emptyItemsSummaryMessageEl.classList.add('hidden');
+                sortedAggregatedItems.forEach(item => {
+                    const itemSummaryDiv = document.createElement('div');
+                    itemSummaryDiv.className = `
+                        flex justify-between items-center py-2 border-b border-gray-700 last:border-b-0
+                    `;
+                    itemSummaryDiv.innerHTML = `
+                        <span class="text-gray-200">${item.name}</span>
+                        <span class="text-gray-300">Qty: ${item.quantity}</span>
+                        <span class="text-white font-semibold">${formatCurrency(item.totalRevenue)}</span>
+                    `;
+                    reportItemsSummaryEl.appendChild(itemSummaryDiv);
+                });
+            }
 
-            // Use onload to ensure content is rendered before printing
-            printWindow.onload = () => {
-                printWindow.focus(); // Focus the new window
-                printWindow.print(); // Open the print dialog
-                // Set a timeout to close the window after print dialog is handled
-                setTimeout(() => {
-                    printWindow.close();
-                    // When printing from reports, we don't clear the main app's cart.
-                    // We only want to reset the main app's state if we just completed a new sale.
-                    // This logic is now handled in `finalizeSale`.
-                }, 500); // Small delay to ensure print dialog appears before closing
-            };
+            // Display individual sales in the report details list (optional, can be removed if only aggregated is desired)
+            // For now, keeping it as requested previously, but the main focus is the item summary now.
+            if (filteredSales.length === 0) {
+                reportDetailsListEl.innerHTML = '<p class="text-gray-400 text-center py-8">No individual sales data for this period.</p>';
+            } else {
+                // Add a header for individual sales logs if there are any
+                reportDetailsListEl.innerHTML = `<h4 class="text-xl font-semibold text-blue-300 mb-4">Individual Sales Logs:</h4>`;
+                filteredSales.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+                filteredSales.forEach(log => {
+                    const logDiv = document.createElement('div');
+                    logDiv.className = `
+                        bg-gray-700 rounded-lg p-3 mb-3 shadow-sm border border-gray-600
+                        flex justify-between items-center text-sm
+                    `;
+                    logDiv.innerHTML = `
+                        <div>
+                            <p class="font-semibold text-white">${log.salesInvoiceId}</p>
+                            <p class="text-gray-300">${new Date(log.timestamp).toLocaleString()}</p>
+                            <p class="text-gray-400">Customer: ${log.customer.name}</p>
+                        </div>
+                        <span class="text-lg font-bold text-blue-300">${formatCurrency(log.total)}</span>
+                    `;
+                    reportDetailsListEl.appendChild(logDiv);
+                });
+            }
+        }
+
+        /**
+         * Downloads the current sales report as a PDF.
+         */
+        async function generatePdfReport() {
+            // Re-render sales report just before generating PDF to ensure it's up-to-date
+            // based on the selected filter.
+            renderSalesReport();
+
+            const element = document.getElementById('sales-report-content'); // Target the entire report content area
+            const { jsPDF } = window.jspdf; // Get jsPDF from the UMD bundle
+
+            // Hide buttons that should not appear in the PDF
+            const buttonsToHide = [filterDailyBtn, filterWeeklyBtn, filterMonthlyBtn, downloadReportPdfBtn];
+            buttonsToHide.forEach(btn => btn.classList.add('hidden'));
+
+            try {
+                // Generate canvas from HTML element
+                const canvas = await html2canvas(element, {
+                    scale: 2, // Increase scale for better quality
+                    useCORS: true, // Needed if you have images from other domains
+                    logging: false // Disable logging
+                });
+
+                const imgData = canvas.toDataURL('image/png');
+                const imgWidth = 210; // A4 width in mm
+                const pageHeight = 297; // A4 height in mm
+                const imgHeight = canvas.height * imgWidth / canvas.width;
+                let heightLeft = imgHeight;
+
+                const doc = new jsPDF('p', 'mm', 'a4'); // Portrait, mm units, A4 size
+                let position = 0;
+
+                // Add title to the PDF
+                doc.setFontSize(22);
+                doc.text("Garahe ni Hulyo Sales Report", imgWidth / 2, 20, { align: 'center' });
+                doc.setFontSize(12);
+                doc.text(`${reportPeriodInfoEl.textContent}`, imgWidth / 2, 30, { align: 'center' });
+                position = 40; // Adjust starting position for the image after title
+
+                // Check if the image fits on one page
+                if (imgHeight <= (pageHeight - position)) {
+                    doc.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                } else {
+                    // If not, add multiple pages
+                    doc.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                    heightLeft -= (pageHeight - position);
+
+                    while (heightLeft >= 0) {
+                        position = heightLeft - imgHeight;
+                        doc.addPage();
+                        doc.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                        heightLeft -= pageHeight;
+                    }
+                }
+
+                doc.save(`Sales_Report_${currentReportFilter}_${new Date().toISOString().slice(0, 10)}.pdf`);
+                showMessageBox('Success', 'Sales report downloaded successfully as PDF!');
+
+            } catch (error) {
+                console.error("Error generating PDF:", error);
+                showMessageBox('Error', 'Failed to generate PDF. Please try again or check console for details.');
+            } finally {
+                // Show buttons again after PDF generation (even if it failed)
+                buttonsToHide.forEach(btn => btn.classList.remove('hidden'));
+            }
         }
 
 
         // --- Firestore Listeners ---
         let inventoryUnsubscribe;
         let salesLogsUnsubscribe;
+        // let currentAppId = ''; // Define currentAppId here - REMOVED: Redundant declaration
 
         // Function to set up Firestore listeners (called after Firebase is ready)
         function setupFirestoreListeners() {
-            if (!isFirebaseReady) return;
+            if (!isFirebaseReady || !currentAppId) {
+                console.error("Firestore listeners cannot be set up: Firebase not ready or currentAppId is missing.");
+                return;
+            }
 
             // Reference to the public inventory collection
-            const inventoryCollectionRef = firebase.collection(db, `artifacts/${FIREBASE_PROJECT_ID}/public/data/inventory`);
+            const inventoryCollectionRef = firebase.collection(db, `artifacts/${currentAppId}/public/data/inventory`);
             // Reference to the public sales logs collection
-            const salesLogsCollectionRef = firebase.collection(db, `artifacts/${FIREBASE_PROJECT_ID}/public/data/salesLogs`);
+            const salesLogsCollectionRef = firebase.collection(db, `artifacts/${currentAppId}/public/data/salesLogs`);
 
             // Inventory Listener
             inventoryLoadingEl.classList.remove('hidden');
+            masterListLoadingEl.classList.remove('hidden'); // Also show loading for master list
             inventoryUnsubscribe = firebase.onSnapshot(inventoryCollectionRef, async (snapshot) => {
                 const fetchedInventory = [];
                 snapshot.forEach(doc => {
@@ -1558,7 +2109,9 @@
                 });
                 inventory = fetchedInventory; // Update global inventory array
                 renderInventory(getFilteredInventory()); // Re-render current view with new data
+                renderMasterList(getFilteredMasterList()); // Re-render master list with new data
                 inventoryLoadingEl.classList.add('hidden');
+                masterListLoadingEl.classList.add('hidden');
 
                 // If inventory is empty, populate it with initial data (one-time operation)
                 if (inventory.length === 0) {
@@ -1568,10 +2121,6 @@
                         { id: 'item-003', name: 'Brake Pad Set (Front)', price: 59.95, stock: 60, restockLevel: 10, imageUrl: 'https://placehold.co/80x80/000000/FFFFFF?text=Brake' },
                         { id: 'item-004', name: 'Oil Filter (Premium)', price: 8.75, stock: 200, restockLevel: 25, imageUrl: 'https://placehold.co/80x80/000000/FFFFFF?text=Filter' },
                         { id: 'item-005', name: 'Air Filter (Performance)', price: 25.00, stock: 90, restockLevel: 15, imageUrl: 'https://placehold.co/80x80/000000/FFFFFF?text=Air' },
-                        { id: 'item-006', name: 'Tire (Sport Touring)', price: 180.00, stock: 40, restockLevel: 5, imageUrl: 'https://placehold.co/80x80/000000/FFFFFF?text=Tire' },
-                        { id: 'item-007', name: 'Chain Lube (Heavy Duty)', price: 9.99, stock: 120, restockLevel: 20, imageUrl: 'https://placehold.co/80x80/000000/FFFFFF?text=Lube' },
-                        { id: 'item-008', name: 'Battery (Maintenance Free)', price: 85.00, stock: 30, restockLevel: 8, imageUrl: 'https://placehold.co/80x80/000000/FFFFFF?text=Battery' },
-                        { id: 'item-009', name: 'Headlight Bulb (LED)', price: 22.50, stock: 75, restockLevel: 10, imageUrl: 'https://placehold.co/80x80/000000/FFFFFF?text=Bulb' },
                         { id: 'item-010', name: 'Mirror Set (Custom)', price: 45.00, stock: 25, restockLevel: 5, imageUrl: 'https://placehold.co/80x80/000000/FFFFFF?text=Mirror' },
                         { id: 'item-011', name: 'Helmet (Full Face)', price: 199.99, stock: 15, restockLevel: 3, imageUrl: 'https://placehold.co/80x80/000000/FFFFFF?text=Helmet' },
                         { id: 'item-012', name: 'Jacket (Riding Gear)', price: 150.00, stock: 20, restockLevel: 5, imageUrl: 'https://placehold.co/80x80/000000/FFFFFF?text=Jacket' },
@@ -1581,7 +2130,7 @@
                     if (existingDocs.empty) {
                         for (const item of initialData) {
                             try {
-                                await firebase.setDoc(firebase.doc(db, `artifacts/${FIREBASE_PROJECT_ID}/public/data/inventory`, item.id), item);
+                                await firebase.setDoc(firebase.doc(db, `artifacts/${currentAppId}/public/data/inventory`, item.id), item);
                             } catch (e) {
                                 console.error("Error setting initial inventory item:", item.id, e);
                             }
@@ -1592,6 +2141,7 @@
                 console.error("Error listening to inventory:", error);
                 showMessageBox('Data Error', 'Failed to load inventory data. Please check your connection and try again.');
                 inventoryLoadingEl.classList.add('hidden');
+                masterListLoadingEl.classList.add('hidden');
             });
 
             // Sales Logs Listener
@@ -1603,6 +2153,7 @@
                 });
                 salesLogs = fetchedSalesLogs; // Update global salesLogs array
                 renderReportLogs(); // Re-render the report logs
+                renderSalesReport(); // Re-render the sales report with new data
                 salesLogLoadingEl.classList.add('hidden');
 
                 // Update salesInvoiceCounter to ensure unique new IDs
@@ -1622,57 +2173,15 @@
 
 
         // --- Event Listeners ---
-        inventorySearchEl.addEventListener('input', () => {
-            renderInventory(getFilteredInventory());
-        });
-
-        checkoutButtonEl.addEventListener('click', initiateCheckout);
-
-        // Main Tab button event listeners
-        tabInventoryBtn.addEventListener('click', () => switchMainTab('inventory'));
-        tabManageProductsBtn.addEventListener('click', () => switchMainTab('manage-products'));
-        tabReportLogsBtn.addEventListener('click', () => switchMainTab('report-logs')); // Event listener for new button
-
-        // Manage Products Modal event listeners
-        manageProductModalCloseBtn.addEventListener('click', closeManageProductModal);
-        modalTabAddProductBtn.addEventListener('click', () => switchModalTab('add-product'));
-        modalTabRestockProductBtn.addEventListener('click', () => switchModalTab('restock-product'));
-        modalAddProductBtn.addEventListener('click', addNewProduct);
-        modalNewProductImageEl.addEventListener('change', (event) => {
-            const file = event.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    modalImagePreviewEl.src = e.target.result;
-                    modalImagePreviewEl.classList.remove('hidden');
-                };
-                reader.readAsDataURL(file);
-            } else {
-                modalImagePreviewEl.src = '';
-                modalImagePreviewEl.classList.add('hidden');
-            }
-        });
-
-        // Restock Product listeners (inside Manage Products Modal)
-        modalRestockSearchEl.addEventListener('input', () => {
-            renderModalRestockList(inventory); // Pass current inventory for filtering
-        });
-        modalApplyRestockBtn.addEventListener('click', applyRestock);
-
-        // Sale Summary Modal event listeners
-        saleSummaryModalCloseBtn.addEventListener('click', closeSaleSummaryModal);
-        saleSummaryCancelBtn.addEventListener('click', closeSaleSummaryModal);
-        saleSummaryCheckoutBtn.addEventListener('click', finalizeSale);
-
-        // The "Print" and "New Sale" buttons for the receipt are handled
-        // within the `openReceiptForPrinting` function which creates a new window.
-        // Their event listeners are attached to the elements *within that new window's DOM*.
-
+        // These will be assigned inside window.onload
 
         // --- Initial Setup on Window Load ---
-        // Declare FIREBASE_CONFIG and FIREBASE_PROJECT_ID globally
+        // Declare FIREBASE_CONFIG and currentAppId globally
         let FIREBASE_CONFIG = {};
-        let FIREBASE_PROJECT_ID = ''; // This will be set from firebaseConfig.projectId
+        // currentAppId will hold the actual app ID for Firestore paths
+        // Initialized here, and its value will be set in window.onload
+        let currentAppId = '';
+
 
         window.onload = async function() {
             // Ensure Firebase is loaded from the module script
@@ -1681,8 +2190,100 @@
                 return;
             }
 
-            // --- IMPORTANT: REPLACE WITH YOUR ACTUAL FIREBASE CONFIGURATION ---
-            // These values are provided by the user and are for Netlify deployment.
+            // Assign DOM elements here to ensure they are available
+            inventoryListEl = document.getElementById('inventory-list');
+            cartListEl = document.getElementById('cart-list');
+            emptyCartMessageEl = document.getElementById('empty-cart-message');
+            subtotalEl = document.getElementById('subtotal');
+            totalEl = document.getElementById('total');
+            inventorySearchEl = document.getElementById('inventory-search');
+            checkoutButtonEl = document.getElementById('checkout-button');
+
+            tabInventoryBtn = document.getElementById('tab-inventory');
+            tabManageProductsBtn = document.getElementById('tab-manage-products');
+            tabInventoryMasterBtn = document.getElementById('tab-inventory-master');
+            tabReportLogsBtn = document.getElementById('tab-report-logs');
+            tabSalesReportBtn = document.getElementById('tab-sales-report');
+
+            inventoryContentEl = document.getElementById('inventory-content');
+            inventoryMasterContentEl = document.getElementById('inventory-master-content');
+            masterListEl = document.getElementById('master-list');
+            masterListSearchEl = document.getElementById('master-list-search');
+            masterListLoadingEl = document.getElementById('master-list-loading');
+
+            reportLogsContentEl = document.getElementById('report-logs-content');
+            salesLogListEl = document.getElementById('sales-log-list');
+            emptyLogsMessageEl = document.getElementById('empty-logs-message');
+            inventoryLoadingEl = document.getElementById('inventory-loading');
+            salesLogLoadingEl = document.getElementById('sales-log-loading');
+            userIdDisplayEl = document.getElementById('user-id-display');
+
+            messageBoxContainerEl = document.getElementById('message-box-container');
+            messageBoxTitleEl = document.getElementById('message-box-title');
+            messageBoxTextEl = document.getElementById('message-box-text');
+            messageBoxOkBtn = document.getElementById('message-box-ok');
+            messageBoxCancelBtn = document.getElementById('message-box-cancel');
+
+            manageProductModalContainer = document.getElementById('manage-product-modal-container');
+            manageProductModalCloseBtn = document.getElementById('manage-product-modal-close-btn');
+
+            modalTabAddProductBtn = document.getElementById('modal-tab-add-product');
+            modalTabRestockProductBtn = document.getElementById('modal-tab-restock-product');
+
+            modalAddProductContent = document.getElementById('modal-add-product-content');
+            modalRestockProductContent = document.getElementById('modal-restock-product-content');
+
+            modalNewProductNameEl = document.getElementById('modal-new-product-name');
+            modalNewProductPriceEl = document.getElementById('modal-new-product-price');
+            modalNewProductStockEl = document.getElementById('modal-new-product-stock');
+            modalNewProductRestockLevelEl = document.getElementById('modal-new-product-restock-level');
+            modalNewProductImageEl = document.getElementById('modal-new-product-image');
+            modalImagePreviewEl = document.getElementById('modal-image-preview');
+            modalAddProductBtn = document.getElementById('modal-add-product-btn');
+
+            modalRestockSearchEl = document.getElementById('modal-restock-search');
+            modalRestockListEl = document.getElementById('modal-restock-list');
+            modalApplyRestockBtn = document.getElementById('modal-apply-restock-btn');
+
+            editProductDetailsModalContainer = document.getElementById('edit-product-details-modal-container');
+            editProductDetailsModalCloseBtn = document.getElementById('edit-product-details-modal-close-btn');
+            editProductNameEl = document.getElementById('edit-product-name');
+            editProductPriceEl = document.getElementById('edit-product-price');
+            editProductStockEl = document.getElementById('edit-product-stock');
+            editProductRestockLevelEl = document.getElementById('edit-product-restock-level');
+            editProductImageEl = document.getElementById('edit-product-image');
+            editImagePreviewEl = document.getElementById('edit-image-preview');
+            editProductSaveBtn = document.getElementById('edit-product-save-btn');
+
+            saleSummaryModalContainer = document.getElementById('sale-summary-modal-container');
+            saleSummaryModalCloseBtn = document.getElementById('sale-summary-modal-close-btn');
+            customerNameEl = document.getElementById('customer-name');
+            customerAddressEl = document.getElementById('customer-address');
+            customerContactEl = document.getElementById('customer-contact');
+            saleSummaryItemsListEl = document.getElementById('sale-summary-items-list');
+            summarySubtotalEl = document.getElementById('summary-subtotal');
+            summaryTotalEl = document.getElementById('summary-total');
+            saleSummaryCancelBtn = document.getElementById('sale-summary-cancel-btn');
+            saleSummaryCheckoutBtn = document.getElementById('sale-summary-checkout-btn');
+
+            receiptModalContainer = document.getElementById('receipt-modal-container');
+            receiptModalContentTemplate = document.getElementById('receipt-modal-content');
+            // activeReceiptPrintBtn and activeReceiptNewSaleBtn are assigned dynamically
+            receiptCloseBtn = document.getElementById('receipt-close-btn');
+
+            salesReportContentEl = document.getElementById('sales-report-content');
+            filterDailyBtn = document.getElementById('filter-daily');
+            filterWeeklyBtn = document.getElementById('filter-weekly');
+            filterMonthlyBtn = document.getElementById('filter-monthly');
+            reportTotalSalesEl = document.getElementById('report-total-sales');
+            reportPeriodInfoEl = document.getElementById('report-period-info');
+            reportDetailsListEl = document.getElementById('report-details-list');
+            emptyReportMessageEl = document.getElementById('empty-report-message');
+            emptyItemsSummaryMessageEl = document.getElementById('empty-items-summary-message');
+            downloadReportPdfBtn = document.getElementById('download-report-pdf');
+            reportItemsSummaryEl = document.getElementById('report-items-summary');
+
+            // Set FIREBASE_CONFIG - IMPORTANT: Use your actual Firebase config here for external deployment
             FIREBASE_CONFIG = {
                 apiKey: "AIzaSyAuuXHxkDxnYISS8GZOQQac9-r23LCB7wM",
                 authDomain: "motoshop-f5b85.firebaseapp.com",
@@ -1692,10 +2293,11 @@
                 appId: "1:384660348802:web:f7193b62ccdaa95e15799b",
                 measurementId: "G-R9CLFFMPRS"
             };
-            FIREBASE_PROJECT_ID = FIREBASE_CONFIG.projectId; // Set the global projectId
 
-            // For Canvas environment, use the provided variables if they exist.
-            // For Netlify, these will be undefined, and FIREBASE_CONFIG will be used.
+            // Determine the app ID to use for Firestore paths
+            // Prefer __app_id for Canvas environment, fallback to FIREBASE_CONFIG.projectId for external deployment.
+            currentAppId = typeof __app_id !== 'undefined' ? __app_id : FIREBASE_CONFIG.projectId;
+
             const firebaseConfigForInit = (typeof __firebase_config !== 'undefined' && Object.keys(JSON.parse(__firebase_config)).length > 0) ? JSON.parse(__firebase_config) : FIREBASE_CONFIG;
             const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
@@ -1732,8 +2334,98 @@
                 userIdDisplayEl.textContent = `User ID: Not Available`;
             }
 
-            switchMainTab('inventory'); // Start on the inventory tab
+            // Event Listeners - Now assigned after DOM elements are available
+            inventorySearchEl.addEventListener('input', () => {
+                renderInventory(getFilteredInventory());
+            });
+
+            masterListSearchEl.addEventListener('input', () => {
+                renderMasterList(getFilteredMasterList());
+            });
+
+            checkoutButtonEl.addEventListener('click', initiateCheckout);
+
+            // Main Tab button event listeners
+            tabInventoryBtn.addEventListener('click', () => switchMainTab('inventory'));
+            tabManageProductsBtn.addEventListener('click', () => switchMainTab('manage-products'));
+            tabInventoryMasterBtn.addEventListener('click', () => switchMainTab('inventory-master'));
+            tabReportLogsBtn.addEventListener('click', () => switchMainTab('report-logs'));
+            tabSalesReportBtn.addEventListener('click', () => switchMainTab('sales-report')); // New sales report tab listener
+
+            // Manage Products Modal event listeners
+            manageProductModalCloseBtn.addEventListener('click', closeManageProductModal);
+            modalTabAddProductBtn.addEventListener('click', () => switchModalTab('add-product'));
+            modalTabRestockProductBtn.addEventListener('click', () => switchModalTab('restock-product'));
+            modalAddProductBtn.addEventListener('click', addNewProduct);
+            modalNewProductImageEl.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        modalImagePreviewEl.src = e.target.result;
+                        modalImagePreviewEl.classList.remove('hidden');
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    modalImagePreviewEl.src = '';
+                    modalImagePreviewEl.classList.add('hidden');
+                }
+            });
+
+            // Restock Product listeners (inside Manage Products Modal)
+            modalRestockSearchEl.addEventListener('input', () => {
+                renderModalRestockList(inventory); // Pass current inventory for filtering
+            });
+            modalApplyRestockBtn.addEventListener('click', applyRestock);
+
+            // Edit Product Details Modal listeners
+            editProductDetailsModalCloseBtn.addEventListener('click', closeEditProductDetailsModal);
+            editProductSaveBtn.addEventListener('click', saveEditedProduct);
+            editProductImageEl.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        editImagePreviewEl.src = e.target.result;
+                        editImagePreviewEl.classList.remove('hidden');
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    editImagePreviewEl.src = '';
+                    editImagePreviewEl.classList.add('hidden');
+                }
+            });
+
+
+            // Sale Summary Modal event listeners
+            saleSummaryModalCloseBtn.addEventListener('click', closeSaleSummaryModal);
+            saleSummaryCancelBtn.addEventListener('click', closeSaleSummaryModal);
+            saleSummaryCheckoutBtn.addEventListener('click', finalizeSale);
+
+            // Sales Report Filter Buttons
+            filterDailyBtn.addEventListener('click', () => {
+                currentReportFilter = 'daily';
+                document.querySelectorAll('#sales-report-content button').forEach(btn => btn.classList.remove('active'));
+                filterDailyBtn.classList.add('active');
+                renderSalesReport();
+            });
+            filterWeeklyBtn.addEventListener('click', () => {
+                currentReportFilter = 'weekly';
+                document.querySelectorAll('#sales-report-content button').forEach(btn => btn.classList.remove('active'));
+                filterWeeklyBtn.classList.add('active');
+                renderSalesReport();
+            });
+            filterMonthlyBtn.addEventListener('click', () => {
+                currentReportFilter = 'monthly';
+                document.querySelectorAll('#sales-report-content button').forEach(btn => btn.classList.remove('active'));
+                filterMonthlyBtn.classList.add('active');
+                renderSalesReport();
+            });
+            downloadReportPdfBtn.addEventListener('click', generatePdfReport);
+
+            switchMainTab('inventory'); // Start on the dashboard/inventory tab
             renderCart(); // Initial render of cart (will show "empty cart" message)
+            filterDailyBtn.classList.add('active'); // Set daily as default active filter for sales report
         };
     </script>
 </body>
