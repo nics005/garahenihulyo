@@ -27,6 +27,7 @@
 
         body {
             font-family: "Inter", sans-serif;
+            background-color: #1a202c; /* Darker background to match the overall theme */
         }
 
         /* Styles for active tab button */
@@ -57,6 +58,116 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        /* Adjust main container to fill screen and use grid for layout */
+        #main-app-container {
+            display: grid;
+            grid-template-rows: auto 1fr; /* Header row, then main content row */
+            grid-template-columns: 250px 1fr 350px; /* Left sidebar, main content, right sidebar */
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden; /* Prevent overall scrollbars */
+        }
+
+        /* Header spans all columns */
+        #main-header {
+            grid-column: 1 / -1; /* Spans from first to last column line */
+            background-color: #1f2937; /* Dark gray */
+            padding: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #374151; /* Darker border */
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            z-index: 10; /* Ensure it stays on top */
+        }
+
+        /* Left Sidebar */
+        #left-sidebar {
+            grid-column: 1;
+            grid-row: 2; /* Below the header */
+            background-color: #1f2937;
+            padding: 1.5rem;
+            border-right: 1px solid #374151;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto; /* Allow scrolling for navigation if needed */
+            box-shadow: 2px 0 10px rgba(0,0,0,0.2);
+            z-index: 5;
+        }
+
+        /* Main Content Area (Inventory) */
+        #main-content-area {
+            grid-column: 2;
+            grid-row: 2;
+            background-color: #2d3748; /* Slightly lighter than sidebars */
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto; /* Allow scrolling for inventory list */
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.1);
+        }
+
+        /* Right Sidebar (Cart) */
+        #right-sidebar {
+            grid-column: 3;
+            grid-row: 2;
+            background-color: #1f2937;
+            padding: 1.5rem;
+            border-left: 1px solid #374151;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto; /* Allow scrolling for cart items */
+            box-shadow: -2px 0 10px rgba(0,0,0,0.2);
+            z-index: 5;
+        }
+
+        /* Responsive adjustments for smaller screens */
+        @media (max-width: 768px) {
+            #main-app-container {
+                grid-template-rows: auto auto 1fr auto; /* Header, Nav, Main, Cart */
+                grid-template-columns: 1fr; /* Single column */
+                height: auto; /* Allow natural height for scrolling */
+                overflow-y: auto;
+            }
+
+            #main-header {
+                grid-column: 1;
+                grid-row: 1;
+                flex-direction: column;
+                padding-bottom: 0.5rem;
+                border-bottom: none;
+                box-shadow: none;
+            }
+
+            #left-sidebar {
+                grid-column: 1;
+                grid-row: 2; /* Below header */
+                width: 100%;
+                border-right: none;
+                border-bottom: 1px solid #374151;
+                padding-top: 0.5rem;
+                box-shadow: none;
+            }
+
+            #main-content-area {
+                grid-column: 1;
+                grid-row: 3; /* Below left sidebar */
+                width: 100%;
+                padding-top: 1rem;
+                box-shadow: none;
+            }
+
+            #right-sidebar {
+                grid-column: 1;
+                grid-row: 4; /* Below main content */
+                width: 100%;
+                border-left: none;
+                border-top: 1px solid #374151;
+                padding-top: 1rem;
+                box-shadow: none;
+            }
+        }
     </style>
 
     <!-- Firebase SDK Imports (type="module" is crucial) -->
@@ -86,25 +197,38 @@
         };
     </script>
 </head>
-<body class="bg-gray-950 text-gray-100 flex min-h-screen">
-    <!-- Main container for the POS system -->
-    <div class="flex flex-col md:flex-row w-full max-w-7xl mx-auto rounded-lg shadow-2xl overflow-hidden my-4 max-h-[calc(100vh-2rem)]">
+<body class="bg-gray-950 text-gray-100 min-h-screen">
+    <!-- Main application container with grid layout -->
+    <div id="main-app-container">
 
-        <!-- Left Panel: Inventory & Management -->
-        <div class="flex-1 bg-gray-900 border-r border-gray-800 p-6 flex flex-col rounded-l-lg md:rounded-none md:rounded-l-lg">
-            <h1 class="text-3xl font-bold text-white mb-6 text-center">MotorShop Inventory</h1>
-
-            <!-- User ID Display -->
-            <div class="text-xs text-gray-500 mb-4 text-center">
+        <!-- Top Header Panel -->
+        <header id="main-header">
+            <div class="flex items-center space-x-4">
+                <!-- Placeholder for logo/icon -->
+                <img src="https://placehold.co/50x50/3b82f6/FFFFFF?text=M" alt="MotorShop Logo" class="rounded-full">
+                <h1 class="text-3xl font-extrabold text-white">MotorShop POS System</h1>
+            </div>
+            <!-- User ID Display - Moved to header for visibility -->
+            <div class="text-sm text-gray-400 mt-2 md:mt-0">
                 <span id="user-id-display">Loading User...</span>
             </div>
+        </header>
+
+        <!-- Left Sidebar: Navigation & Management -->
+        <div id="left-sidebar">
+            <h2 class="text-2xl font-bold text-white mb-6 text-center">Navigation</h2>
 
             <!-- Navigation Bar for Main Tabs -->
-            <div class="flex justify-center mb-6 bg-gray-800 p-2 rounded-lg shadow-inner border border-gray-700">
+            <div class="flex flex-col space-y-4 mb-6 bg-gray-800 p-3 rounded-lg shadow-inner border border-gray-700">
                 <button id="tab-inventory" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200 active">Inventory</button>
                 <button id="tab-manage-products" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200">Manage Products</button>
                 <button id="tab-report-logs" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200">Report Logs</button>
             </div>
+        </div>
+
+        <!-- Main Content Area: Inventory/Product Listing (adapting from original left panel) -->
+        <div id="main-content-area">
+            <h1 class="text-3xl font-bold text-white mb-6 text-center">Product Listing</h1>
 
             <!-- Inventory Content Area -->
             <div id="inventory-content" class="tab-content flex-1 flex flex-col">
@@ -125,7 +249,7 @@
                 </div>
             </div>
 
-            <!-- Report Logs Content Area -->
+            <!-- Report Logs Content Area - Moved here for now, but usually in a separate view -->
             <div id="report-logs-content" class="tab-content hidden flex-1 flex flex-col">
                 <h3 class="text-2xl font-bold text-white mb-4 text-center">Sales Report Logs</h3>
                 <!-- Loading Indicator for Sales Logs -->
@@ -140,8 +264,8 @@
             </div>
         </div>
 
-        <!-- Right Panel: Cart -->
-        <div class="flex-1 bg-gray-800 p-6 flex flex-col rounded-r-lg md:rounded-none md:rounded-r-lg">
+        <!-- Right Sidebar: Cart & Totals -->
+        <div id="right-sidebar">
             <h1 class="text-3xl font-bold text-white mb-6 text-center">Customer Cart</h1>
 
             <!-- Cart Items List -->
