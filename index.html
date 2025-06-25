@@ -411,33 +411,39 @@
         const inventorySearchEl = document.getElementById('inventory-search');
         const checkoutButtonEl = document.getElementById('checkout-button');
 
+        // Main Tab Navigation Elements
         const tabInventoryBtn = document.getElementById('tab-inventory');
         const tabManageProductsBtn = document.getElementById('tab-manage-products');
-        const tabReportLogsBtn = document.getElementById('tab-report-logs');
+        const tabReportLogsBtn = document.getElementById('tab-report-logs'); // New Reports button
 
         const inventoryContentEl = document.getElementById('inventory-content');
-        const reportLogsContentEl = document.getElementById('report-logs-content');
+        const reportLogsContentEl = document.getElementById('report-logs-content'); // New Reports content area
         const salesLogListEl = document.getElementById('sales-log-list');
         const emptyLogsMessageEl = document.getElementById('empty-logs-message');
         const inventoryLoadingEl = document.getElementById('inventory-loading'); // Loading indicator
         const salesLogLoadingEl = document.getElementById('sales-log-loading'); // Loading indicator
         const userIdDisplayEl = document.getElementById('user-id-display');
 
+        // Message Box Elements
         const messageBoxContainerEl = document.getElementById('message-box-container');
         const messageBoxTitleEl = document.getElementById('message-box-title');
         const messageBoxTextEl = document.getElementById('message-box-text');
         const messageBoxOkBtn = document.getElementById('message-box-ok');
         const messageBoxCancelBtn = document.getElementById('message-box-cancel');
 
+        // Manage Products Modal Elements
         const manageProductModalContainer = document.getElementById('manage-product-modal-container');
         const manageProductModalCloseBtn = document.getElementById('manage-product-modal-close-btn');
 
+        // Modal Tab Navigation Elements
         const modalTabAddProductBtn = document.getElementById('modal-tab-add-product');
         const modalTabRestockProductBtn = document.getElementById('modal-tab-restock-product');
 
+        // Modal Content Areas
         const modalAddProductContent = document.getElementById('modal-add-product-content');
         const modalRestockProductContent = document.getElementById('modal-restock-product-content');
 
+        // Add Product Form Elements (inside modal)
         const modalNewProductNameEl = document.getElementById('modal-new-product-name');
         const modalNewProductPriceEl = document.getElementById('modal-new-product-price');
         const modalNewProductStockEl = document.getElementById('modal-new-product-stock');
@@ -446,10 +452,12 @@
         const modalImagePreviewEl = document.getElementById('modal-image-preview');
         const modalAddProductBtn = document.getElementById('modal-add-product-btn');
 
+        // Restock Product Elements (inside modal)
         const modalRestockSearchEl = document.getElementById('modal-restock-search');
         const modalRestockListEl = document.getElementById('modal-restock-list');
         const modalApplyRestockBtn = document.getElementById('modal-apply-restock-btn');
 
+        // Sale Summary Modal Elements
         const saleSummaryModalContainer = document.getElementById('sale-summary-modal-container');
         const saleSummaryModalCloseBtn = document.getElementById('sale-summary-modal-close-btn');
         const customerNameEl = document.getElementById('customer-name');
@@ -458,10 +466,12 @@
         const saleSummaryItemsListEl = document.getElementById('sale-summary-items-list');
         const summarySubtotalEl = document.getElementById('summary-subtotal');
         const summaryTaxEl = document.getElementById('summary-tax');
-        const summaryTotalEl = document.getElementById('total'); // Corrected to use the main total element
+        const summaryTotalEl = document.getElementById('summary-total');
         const saleSummaryCancelBtn = document.getElementById('sale-summary-cancel-btn');
         const saleSummaryCheckoutBtn = document.getElementById('sale-summary-checkout-btn');
 
+        // Receipt Modal Elements
+        // Note: receipt-modal-container is now effectively just a hidden template
         const receiptModalContentTemplate = document.getElementById('receipt-modal-content');
 
 
@@ -612,15 +622,9 @@
                         </div>
                     </div>
                     <div class="flex items-center space-x-3">
-                        <button data-item-id="${item.id}" data-change="-1"
-                                class="quantity-btn px-3 py-1 bg-gray-700 text-white rounded-md
-                                       hover:bg-gray-600 active:bg-gray-800 transition duration-200
-                                       shadow-md text-sm sm:text-base">-</button>
-                        <span class="text-xl font-bold text-white">${item.quantity}</span>
-                        <button data-item-id="${item.id}" data-change="1"
-                                class="quantity-btn px-3 py-1 bg-gray-700 text-white rounded-md
-                                       hover:bg-gray-600 active:bg-gray-800 transition duration-200
-                                       shadow-md text-sm sm:text-base">+</button>
+                        <input type="number" data-item-id="${item.id}" value="${item.quantity}" min="1"
+                               class="cart-quantity-input w-20 p-2 rounded-md bg-gray-700 border border-gray-600
+                                      text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500 text-center">
                         <span class="text-xl font-bold text-white w-24 text-right">${formatCurrency(item.price * item.quantity)}</span>
                         <button data-item-id="${item.id}"
                                 class="remove-from-cart-btn px-3 py-1 bg-red-600 text-white rounded-md
@@ -631,12 +635,12 @@
                 cartListEl.appendChild(cartItemDiv);
             });
 
-            // Add event listeners for quantity and remove buttons
-            document.querySelectorAll('.quantity-btn').forEach(button => {
-                button.addEventListener('click', async (event) => {
+            // Add event listeners for quantity input and remove buttons
+            document.querySelectorAll('.cart-quantity-input').forEach(input => {
+                input.addEventListener('change', async (event) => { // Use 'change' event for when input loses focus or Enter is pressed
                     const itemId = event.target.dataset.itemId;
-                    const change = parseInt(event.target.dataset.change);
-                    await updateCartQuantity(itemId, change);
+                    const newQuantity = parseInt(event.target.value);
+                    await setCartQuantity(itemId, newQuantity);
                 });
             });
 
@@ -830,17 +834,17 @@
             taxEl.textContent = formatCurrency(tax);
             totalEl.textContent = formatCurrency(total);
 
-            // Also update summary modal totals (using totalEl which is already updated)
-            // summarySubtotalEl.textContent = formatCurrency(subtotal); // Already updated via subtotalEl.textContent
-            // summaryTaxEl.textContent = formatCurrency(tax); // Already updated via taxEl.textContent
-            // summaryTotalEl.textContent = formatCurrency(total); // Already updated via totalEl.textContent
+            // Also update summary modal totals
+            summarySubtotalEl.textContent = formatCurrency(subtotal);
+            summaryTaxEl.textContent = formatCurrency(tax);
+            summaryTotalEl.textContent = formatCurrency(total);
         }
 
         // --- Cart Management Logic ---
 
         /**
          * Adds an item to the cart or increments its quantity if already present.
-         * Also updates inventory stock in Firestore.
+         * Also updates inventory stock.
          * @param {string} itemId - The ID of the item to add.
          */
         async function addItemToCart(itemId) {
@@ -849,7 +853,7 @@
                 return;
             }
             try {
-                const itemDocRef = firebase.doc(db, `artifacts/${__app_id}/public/data/inventory`, itemId);
+                const itemDocRef = firebase.doc(db, `artifacts/${FIREBASE_PROJECT_ID}/public/data/inventory`, itemId);
                 const itemDocSnap = await firebase.getDoc(itemDocRef);
 
                 if (!itemDocSnap.exists()) {
@@ -867,6 +871,7 @@
                 const cartItem = cart.find(item => item.id === itemId);
 
                 if (cartItem) {
+                    // If item is already in cart, increment quantity
                     if (inventoryItem.stock > 0) { // Check inventory stock again
                         cartItem.quantity++;
                         inventoryItem.stock--; // Update local inventory item for immediate visual update
@@ -893,55 +898,81 @@
         }
 
         /**
-         * Updates the quantity of an item in the cart and in Firestore.
+         * Sets the quantity of an item in the cart and updates Firestore.
+         * Handles validation for min (1) and max (available stock + current cart quantity).
          * @param {string} itemId - The ID of the item.
-         * @param {number} change - The amount to change the quantity by (+1 or -1).
+         * @param {number} newQuantity - The desired new quantity for the item.
          */
-        async function updateCartQuantity(itemId, change) {
+        async function setCartQuantity(itemId, newQuantity) {
             if (!isFirebaseReady) {
                 showMessageBox('Loading', 'Please wait while the system is initializing...');
                 return;
             }
+
             try {
                 const cartItem = cart.find(item => item.id === itemId);
                 if (!cartItem) return;
 
-                const itemDocRef = firebase.doc(db, `artifacts/${__app_id}/public/data/inventory`, itemId);
+                const originalCartQuantity = cartItem.quantity;
+
+                // Fetch the current inventory stock from Firestore to ensure accuracy
+                const itemDocRef = firebase.doc(db, `artifacts/${FIREBASE_PROJECT_ID}/public/data/inventory`, itemId);
                 const itemDocSnap = await firebase.getDoc(itemDocRef);
                 if (!itemDocSnap.exists()) {
                     showMessageBox('Error', 'Item not found in inventory for quantity update.');
+                    renderCart(); // Re-render to correct UI if source disappeared
                     return;
                 }
                 const inventoryItem = { id: itemDocSnap.id, ...itemDocSnap.data() };
+                const currentInventoryStock = inventoryItem.stock;
 
-                let newStock = inventoryItem.stock;
-                let newCartQuantity = cartItem.quantity;
-
-                if (change === 1) { // Increase quantity
-                    if (newStock > 0) {
-                        newCartQuantity++;
-                        newStock--;
-                    } else {
-                        showMessageBox('Stock Limit Reached', `Cannot add more ${inventoryItem.name}. All available stock is in your cart.`);
-                    }
-                } else if (change === -1) { // Decrease quantity
-                    if (newCartQuantity > 1) {
-                        newCartQuantity--;
-                        newStock++;
-                    } else {
-                        // If quantity becomes 0, remove item from cart
-                        await removeItemFromCart(itemId);
-                        return; // Exit to avoid re-rendering twice
-                    }
+                // Basic validation for the new quantity input
+                let quantityToSet = parseInt(newQuantity);
+                if (isNaN(quantityToSet) || quantityToSet < 1) {
+                    quantityToSet = 1; // Minimum quantity is 1
                 }
 
-                // Update Firestore and local cart
-                await firebase.updateDoc(itemDocRef, { stock: newStock });
-                cartItem.quantity = newCartQuantity; // Update local cart item
+                // Calculate the maximum allowable quantity in the cart:
+                // This is the current stock in inventory PLUS what was already in the cart.
+                const maxAvailableForCart = currentInventoryStock + originalCartQuantity;
+
+                if (quantityToSet > maxAvailableForCart) {
+                    quantityToSet = maxAvailableForCart; // Don't allow buying more than total available stock
+                    showMessageBox('Stock Limit Reached', `Only ${maxAvailableForCart} of ${inventoryItem.name} can be added to your cart.`);
+                }
+
+                // If the quantity hasn't actually changed after validation, do nothing
+                if (quantityToSet === originalCartQuantity) {
+                    renderCart(); // Still render to ensure UI reflects potential clamping
+                    return;
+                }
+
+                // Calculate the difference in stock based on the change in cart quantity
+                // Positive 'stockChange' means inventory stock increases (cart quantity decreased)
+                // Negative 'stockChange' means inventory stock decreases (cart quantity increased)
+                const stockChange = originalCartQuantity - quantityToSet;
+
+                // Update Firestore stock
+                const updatedInventoryStock = currentInventoryStock + stockChange;
+                await firebase.updateDoc(itemDocRef, { stock: updatedInventoryStock });
+
+                // Update local cart quantity or remove if quantity is 0
+                if (quantityToSet === 0) {
+                    // This case should ideally be handled by 'removeItemFromCart'
+                    // but if somehow set to 0, ensure it's removed.
+                    cart.splice(cart.findIndex(item => item.id === itemId), 1);
+                } else {
+                    cartItem.quantity = quantityToSet;
+                }
+
+                // Re-render both cart and inventory to reflect changes
                 renderCart();
+                // No direct call to renderInventory needed, as its data is updated via onSnapshot.
+
             } catch (error) {
-                console.error("Error updating cart quantity:", error);
+                console.error("Error setting cart quantity:", error);
                 showMessageBox('Error', 'Failed to update item quantity. Please try again.');
+                renderCart(); // Attempt to revert UI if there was an error
             }
         }
 
@@ -958,7 +989,7 @@
                 const itemIndex = cart.findIndex(item => item.id === itemId);
                 if (itemIndex > -1) {
                     const removedItem = cart[itemIndex];
-                    const itemDocRef = firebase.doc(db, `artifacts/${__app_id}/public/data/inventory`, itemId);
+                    const itemDocRef = firebase.doc(db, `artifacts/${FIREBASE_PROJECT_ID}/public/data/inventory`, itemId);
                     const itemDocSnap = await firebase.getDoc(itemDocRef);
                     if (itemDocSnap.exists()) {
                         const inventoryItem = { id: itemDocSnap.id, ...itemDocSnap.data() };
@@ -1049,7 +1080,7 @@
 
             try {
                 // Add the new product to Firestore with the generated ID as document ID
-                const docRef = firebase.doc(db, `artifacts/${__app_id}/public/data/inventory`, newProductId);
+                const docRef = firebase.doc(db, `artifacts/${FIREBASE_PROJECT_ID}/public/data/inventory`, newProductId);
                 await firebase.setDoc(docRef, newProductData);
 
                 modalNewProductNameEl.value = '';
@@ -1086,7 +1117,7 @@
                 const inventoryItem = inventory.find(item => item.id === itemId);
 
                 if (inventoryItem && !isNaN(quantity) && quantity > 0) {
-                    const itemDocRef = firebase.doc(db, `artifacts/${__app_id}/public/data/inventory`, itemId);
+                    const itemDocRef = firebase.doc(db, `artifacts/${FIREBASE_PROJECT_ID}/public/data/inventory`, itemId);
                     updates.push(firebase.updateDoc(itemDocRef, { stock: inventoryItem.stock + quantity }));
                     restockedCount++;
                     totalRestockedUnits += quantity;
@@ -1258,7 +1289,7 @@
                     };
 
                     // Add the completed sale to Firestore
-                    await firebase.addDoc(firebase.collection(db, `artifacts/${__app_id}/public/data/salesLogs`), completedSale);
+                    await firebase.addDoc(firebase.collection(db, `artifacts/${FIREBASE_PROJECT_ID}/public/data/salesLogs`), completedSale);
 
                     // Clear the cart for a new sale
                     cart = [];
@@ -1390,9 +1421,9 @@
             if (!isFirebaseReady) return;
 
             // Reference to the public inventory collection
-            const inventoryCollectionRef = firebase.collection(db, `artifacts/${__app_id}/public/data/inventory`);
+            const inventoryCollectionRef = firebase.collection(db, `artifacts/${FIREBASE_PROJECT_ID}/public/data/inventory`);
             // Reference to the public sales logs collection
-            const salesLogsCollectionRef = firebase.collection(db, `artifacts/${__app_id}/public/data/salesLogs`);
+            const salesLogsCollectionRef = firebase.collection(db, `artifacts/${FIREBASE_PROJECT_ID}/public/data/salesLogs`);
 
             // Inventory Listener
             inventoryLoadingEl.classList.remove('hidden');
@@ -1426,7 +1457,7 @@
                     if (existingDocs.empty) {
                         for (const item of initialData) {
                             try {
-                                await firebase.setDoc(firebase.doc(db, `artifacts/${__app_id}/public/data/inventory`, item.id), item);
+                                await firebase.setDoc(firebase.doc(db, `artifacts/${FIREBASE_PROJECT_ID}/public/data/inventory`, item.id), item);
                             } catch (e) {
                                 console.error("Error setting initial inventory item:", item.id, e);
                             }
@@ -1476,7 +1507,7 @@
         // Main Tab button event listeners
         tabInventoryBtn.addEventListener('click', () => switchMainTab('inventory'));
         tabManageProductsBtn.addEventListener('click', () => switchMainTab('manage-products'));
-        tabReportLogsBtn.addEventListener('click', () => switchMainTab('report-logs'));
+        tabReportLogsBtn.addEventListener('click', () => switchMainTab('report-logs')); // Event listener for new button
 
         // Manage Products Modal event listeners
         manageProductModalCloseBtn.addEventListener('click', closeManageProductModal);
@@ -1509,8 +1540,16 @@
         saleSummaryCancelBtn.addEventListener('click', closeSaleSummaryModal);
         saleSummaryCheckoutBtn.addEventListener('click', finalizeSale);
 
+        // The "Print" and "New Sale" buttons for the receipt are handled
+        // within the `openReceiptForPrinting` function which creates a new window.
+        // Their event listeners are attached to the elements *within that new window's DOM*.
+
 
         // --- Initial Setup on Window Load ---
+        // Declare FIREBASE_CONFIG and FIREBASE_PROJECT_ID globally
+        let FIREBASE_CONFIG = {};
+        let FIREBASE_PROJECT_ID = ''; // This will be set from firebaseConfig.projectId
+
         window.onload = async function() {
             // Ensure Firebase is loaded from the module script
             if (typeof window.firebase === 'undefined') {
@@ -1518,12 +1557,27 @@
                 return;
             }
 
-            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-            const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+            // --- IMPORTANT: REPLACE WITH YOUR ACTUAL FIREBASE CONFIGURATION ---
+            // These values are provided by the user and are for Netlify deployment.
+            FIREBASE_CONFIG = {
+                apiKey: "AIzaSyAuuXHxkDxnYISS8GZOQQac9-r23LCB7wM",
+                authDomain: "motoshop-f5b85.firebaseapp.com",
+                projectId: "motoshop-f5b85",
+                storageBucket: "motoshop-f5b85.firebasestorage.app",
+                messagingSenderId: "384660348802",
+                appId: "1:384660348802:web:f7193b62ccdaa95e15799b",
+                measurementId: "G-R9CLFFMPRS"
+            };
+            FIREBASE_PROJECT_ID = FIREBASE_CONFIG.projectId; // Set the global projectId
+
+            // For Canvas environment, use the provided variables if they exist.
+            // For Netlify, these will be undefined, and FIREBASE_CONFIG will be used.
+            const firebaseConfigForInit = (typeof __firebase_config !== 'undefined' && Object.keys(JSON.parse(__firebase_config)).length > 0) ? JSON.parse(__firebase_config) : FIREBASE_CONFIG;
             const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
+
             try {
-                firebaseApp = window.firebase.initializeApp(firebaseConfig);
+                firebaseApp = window.firebase.initializeApp(firebaseConfigForInit);
                 auth = window.firebase.getAuth(firebaseApp);
                 db = window.firebase.getFirestore(firebaseApp);
 
@@ -1536,10 +1590,10 @@
                         setupFirestoreListeners(); // Start listening to Firestore changes after auth is ready
                     } else {
                         try {
-                            if (initialAuthToken) {
+                            if (initialAuthToken) { // This part will only work in Canvas
                                 await window.firebase.signInWithCustomToken(auth, initialAuthToken);
                             } else {
-                                await window.firebase.signInAnonymously(auth);
+                                await window.firebase.signInAnonymously(auth); // This is the fallback for Netlify
                             }
                         } catch (anonError) {
                             console.error("Error signing in anonymously:", anonError);
