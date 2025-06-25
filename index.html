@@ -1,0 +1,1562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MotorShop POS</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom scrollbar for a metallic look */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1f2937; /* Dark gray for track */
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4b5563; /* Medium gray for thumb */
+            border-radius: 4px;
+            border: 1px solid #374151; /* Darker border */
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6b7280; /* Lighter gray on hover */
+        }
+
+        body {
+            font-family: "Inter", sans-serif;
+        }
+
+        /* Styles for active tab button */
+        .tab-button.active {
+            background-color: #3b82f6; /* Blue-600 */
+            color: #ffffff;
+            box-shadow: 0 4px 14px 0 rgba(59, 130, 246, 0.4);
+        }
+
+        /* Styles for modal internal tab button */
+        .modal-tab-button.active {
+            background-color: #3b82f6; /* Blue-600 */
+            color: #ffffff;
+            box-shadow: 0 4px 14px 0 rgba(59, 130, 246, 0.4);
+        }
+
+        /* Loading spinner styles */
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+
+    <!-- Firebase SDK Imports (type="module" is crucial) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, addDoc, onSnapshot, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Expose Firebase objects globally for use in the main script
+        window.firebase = {
+            initializeApp,
+            getAuth,
+            signInAnonymously,
+            signInWithCustomToken,
+            onAuthStateChanged,
+            getFirestore,
+            doc,
+            getDoc,
+            setDoc,
+            updateDoc,
+            addDoc,
+            onSnapshot,
+            collection,
+            query,
+            where,
+            getDocs
+        };
+    </script>
+</head>
+<body class="bg-gray-950 text-gray-100 flex min-h-screen">
+    <!-- Main container for the POS system -->
+    <div class="flex flex-col md:flex-row w-full max-w-7xl mx-auto rounded-lg shadow-2xl overflow-hidden my-4 max-h-[calc(100vh-2rem)]">
+
+        <!-- Left Panel: Inventory & Management -->
+        <div class="flex-1 bg-gray-900 border-r border-gray-800 p-6 flex flex-col rounded-l-lg md:rounded-none md:rounded-l-lg">
+            <h1 class="text-3xl font-bold text-white mb-6 text-center">MotorShop Inventory</h1>
+
+            <!-- User ID Display -->
+            <div class="text-xs text-gray-500 mb-4 text-center">
+                <span id="user-id-display">Loading User...</span>
+            </div>
+
+            <!-- Navigation Bar for Main Tabs -->
+            <div class="flex justify-center mb-6 bg-gray-800 p-2 rounded-lg shadow-inner border border-gray-700">
+                <button id="tab-inventory" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200 active">Inventory</button>
+                <button id="tab-manage-products" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200">Manage Products</button>
+                <button id="tab-report-logs" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200">Report Logs</button>
+            </div>
+
+            <!-- Inventory Content Area -->
+            <div id="inventory-content" class="tab-content flex-1 flex flex-col">
+                <!-- Search Bar -->
+                <div class="mb-6">
+                    <input type="text" id="inventory-search" placeholder="Search for parts..."
+                           class="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 placeholder-gray-500
+                                  focus:outline-none focus:ring-2 focus:ring-blue-600 transition duration-200">
+                </div>
+                <!-- Loading Indicator for Inventory -->
+                <div id="inventory-loading" class="flex justify-center items-center h-full hidden">
+                    <div class="spinner"></div>
+                    <p class="ml-3 text-gray-400">Loading Inventory...</p>
+                </div>
+                <!-- Inventory List -->
+                <div id="inventory-list" class="flex-1 overflow-y-auto pr-2">
+                    <!-- Inventory items will be rendered here by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Report Logs Content Area -->
+            <div id="report-logs-content" class="tab-content hidden flex-1 flex flex-col">
+                <h3 class="text-2xl font-bold text-white mb-4 text-center">Sales Report Logs</h3>
+                <!-- Loading Indicator for Sales Logs -->
+                <div id="sales-log-loading" class="flex justify-center items-center h-full hidden">
+                    <div class="spinner"></div>
+                    <p class="ml-3 text-gray-400">Loading Sales Logs...</p>
+                </div>
+                <div id="sales-log-list" class="flex-1 overflow-y-auto pr-2">
+                    <!-- Sales logs will be rendered here by JavaScript -->
+                    <p class="text-gray-400 text-center py-8" id="empty-logs-message">No sales records available yet.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel: Cart -->
+        <div class="flex-1 bg-gray-800 p-6 flex flex-col rounded-r-lg md:rounded-none md:rounded-r-lg">
+            <h1 class="text-3xl font-bold text-white mb-6 text-center">Customer Cart</h1>
+
+            <!-- Cart Items List -->
+            <div id="cart-list" class="flex-1 overflow-y-auto pr-2 mb-6">
+                <!-- Cart items will be rendered here by JavaScript -->
+                <p id="empty-cart-message" class="text-gray-400 text-center py-8">Your cart is empty. Add some items!</p>
+            </div>
+
+            <!-- Totals Section -->
+            <div class="border-t border-gray-700 pt-6">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-lg text-gray-300">Subtotal:</span>
+                    <span id="subtotal" class="text-xl font-semibold text-white">$0.00</span>
+                </div>
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-lg text-gray-300">Tax (10%):</span>
+                    <span id="tax" class="text-xl font-semibold text-white">$0.00</span>
+                </div>
+                <div class="flex justify-between items-center mb-4">
+                    <span class="text-2xl font-bold text-blue-400">Total:</span>
+                    <span id="total" class="text-3xl font-extrabold text-blue-300">$0.00</span>
+                </div>
+
+                <!-- Checkout Button -->
+                <button id="checkout-button"
+                        class="w-full py-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold
+                               rounded-lg shadow-lg transform transition duration-200 hover:scale-105
+                               focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800">
+                    Process Sale
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Message Box Container (for alerts/confirmations) -->
+    <div id="message-box-container" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50">
+        <div class="bg-gray-800 p-6 rounded-lg shadow-xl border border-gray-700 w-96">
+            <h3 id="message-box-title" class="text-xl font-bold text-white mb-4"></h3>
+            <p id="message-box-text" class="text-gray-300 mb-6"></p>
+            <div class="flex justify-end space-x-3">
+                <button id="message-box-cancel" class="px-5 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 transition duration-200">Cancel</button>
+                <button id="message-box-ok" class="px-5 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-200">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manage Products Modal -->
+    <div id="manage-product-modal-container" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-40">
+        <div class="bg-gray-800 p-6 rounded-lg shadow-xl border border-gray-700 w-full max-w-2xl h-5/6 flex flex-col">
+            <div class="flex justify-between items-center border-b border-gray-700 pb-4 mb-4">
+                <h2 class="text-2xl font-bold text-white">Manage Products</h2>
+                <button id="manage-product-modal-close-btn"
+                        class="text-gray-400 hover:text-white text-3xl leading-none font-semibold">
+                    &times;
+                </button>
+            </div>
+
+            <!-- Modal Tab Navigation -->
+            <div class="flex justify-center mb-6 bg-gray-700 p-2 rounded-lg shadow-inner border border-gray-600">
+                <button id="modal-tab-add-product" class="modal-tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-600 hover:text-white transition duration-200 active">Add Product</button>
+                <button id="modal-tab-restock-product" class="modal-tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-600 hover:text-white transition duration-200">Restock Product</button>
+            </div>
+
+            <!-- Modal Content Areas -->
+            <div id="modal-add-product-content" class="modal-tab-content flex-1 flex flex-col overflow-y-auto pr-2">
+                <h3 class="text-xl font-bold text-white mb-4 text-center">Add New Product</h3>
+                <div class="mb-4">
+                    <label for="modal-new-product-name" class="block text-gray-300 text-sm font-bold mb-2">Product Name:</label>
+                    <input type="text" id="modal-new-product-name"
+                           class="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 placeholder-gray-500
+                                  focus:outline-none focus:ring-2 focus:ring-blue-600 transition duration-200">
+                </div>
+                <div class="mb-4">
+                    <label for="modal-new-product-price" class="block text-gray-300 text-sm font-bold mb-2">Price ($):</label>
+                    <input type="number" id="modal-new-product-price" step="0.01" min="0"
+                           class="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 placeholder-gray-500
+                                  focus:outline-none focus:ring-2 focus:ring-blue-600 transition duration-200">
+                </div>
+                <div class="mb-4">
+                    <label for="modal-new-product-stock" class="block text-gray-300 text-sm font-bold mb-2">Initial Stock:</label>
+                    <input type="number" id="modal-new-product-stock" min="0"
+                           class="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 placeholder-gray-500
+                                  focus:outline-none focus:ring-2 focus:ring-blue-600 transition duration-200">
+                </div>
+                <div class="mb-6">
+                    <label for="modal-new-product-restock-level" class="block text-gray-300 text-sm font-bold mb-2">Restock Level:</label>
+                    <input type="number" id="modal-new-product-restock-level" min="0" value="10"
+                           class="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 placeholder-gray-500
+                                  focus:outline-none focus:ring-2 focus:ring-blue-600 transition duration-200">
+                </div>
+                <div class="mb-6">
+                    <label for="modal-new-product-image" class="block text-gray-300 text-sm font-bold mb-2">Product Image:</label>
+                    <input type="file" id="modal-new-product-image" accept="image/*"
+                           class="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 placeholder-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer">
+                    <div class="mt-4 flex justify-center">
+                        <img id="modal-image-preview" class="max-w-full max-h-48 rounded-md border border-gray-700 object-contain hidden" alt="Image Preview">
+                    </div>
+                </div>
+                <button id="modal-add-product-btn"
+                        class="w-full py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold
+                               rounded-lg shadow-lg transform transition duration-200 hover:scale-105
+                               focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800">
+                    Add Product
+                </button>
+            </div>
+
+            <div id="modal-restock-product-content" class="modal-tab-content hidden flex-1 flex flex-col overflow-y-auto pr-2">
+                <h3 class="text-xl font-bold text-white mb-4 text-center">Restock Products</h3>
+                <!-- Restock Search Bar -->
+                <div class="mb-6">
+                    <input type="text" id="modal-restock-search" placeholder="Search products to restock..."
+                           class="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 placeholder-gray-500
+                                  focus:outline-none focus:ring-2 focus:ring-blue-600 transition duration-200">
+                </div>
+                <div id="modal-restock-list" class="flex-1 overflow-y-auto pr-2 mb-6">
+                    <!-- Restock items will be rendered here by JavaScript -->
+                </div>
+                <button id="modal-apply-restock-btn"
+                        class="w-full py-3 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-bold
+                               rounded-lg shadow-lg transform transition duration-200 hover:scale-105
+                               focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-gray-800">
+                    Apply Restock
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sale Summary Modal -->
+    <div id="sale-summary-modal-container" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-40">
+        <div class="bg-gray-800 p-6 rounded-lg shadow-xl border border-gray-700 w-full max-w-xl max-h-[90vh] flex flex-col overflow-y-auto">
+            <div class="flex justify-between items-center border-b border-gray-700 pb-4 mb-4">
+                <h2 class="text-2xl font-bold text-white">Sale Summary</h2>
+                <button id="sale-summary-modal-close-btn"
+                        class="text-gray-400 hover:text-white text-3xl leading-none font-semibold">
+                    &times;
+                </button>
+            </div>
+
+            <!-- Customer Information -->
+            <div class="mb-6 p-4 bg-gray-900 rounded-lg border border-gray-700">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">Customer Information</h3>
+                <div class="mb-3">
+                    <label for="customer-name" class="block text-gray-300 text-sm font-bold mb-1">Name:</label>
+                    <input type="text" id="customer-name" placeholder="Customer Name"
+                           class="w-full p-2 rounded-md bg-gray-700 border border-gray-600 text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                </div>
+                <div class="mb-3">
+                    <label for="customer-address" class="block text-gray-300 text-sm font-bold mb-1">Address:</label>
+                    <input type="text" id="customer-address" placeholder="Customer Address"
+                           class="w-full p-2 rounded-md bg-gray-700 border border-gray-600 text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label for="customer-contact" class="block text-gray-300 text-sm font-bold mb-1">Contact No.:</label>
+                    <input type="text" id="customer-contact" placeholder="Customer Contact Number"
+                           class="w-full p-2 rounded-md bg-gray-700 border border-gray-600 text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                </div>
+            </div>
+
+            <!-- Sale Items Summary -->
+            <div class="flex-1 overflow-y-auto pr-2 mb-6 border border-gray-700 rounded-lg p-4 bg-gray-900">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">Items</h3>
+                <div id="sale-summary-items-list">
+                    <!-- Cart items for summary will be rendered here -->
+                </div>
+            </div>
+
+            <!-- Sale Totals Summary -->
+            <div class="border-t border-gray-700 pt-6">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-lg text-gray-300">Subtotal:</span>
+                    <span id="summary-subtotal" class="text-xl font-semibold text-white">$0.00</span>
+                </div>
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-lg text-gray-300">Tax (10%):</span>
+                    <span id="summary-tax" class="text-xl font-semibold text-white">$0.00</span>
+                </div>
+                <div class="flex justify-between items-center mb-4">
+                    <span class="text-2xl font-bold text-blue-400">Total:</span>
+                    <span id="summary-total" class="text-3xl font-extrabold text-blue-300">$0.00</span>
+                </div>
+
+                <div class="flex justify-end space-x-3">
+                    <button id="sale-summary-cancel-btn" class="px-5 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 transition duration-200">Cancel</button>
+                    <button id="sale-summary-checkout-btn"
+                            class="px-5 py-2 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold
+                                   rounded-lg shadow-lg transform transition duration-200 hover:scale-105
+                                   focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800">
+                        Checkout
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Receipt Modal - This modal's content will be copied to a new window for printing -->
+    <div id="receipt-modal-container" class="hidden">
+        <div id="receipt-modal-content" class="bg-white text-gray-900 p-8 rounded-lg shadow-xl w-full max-w-sm flex flex-col">
+            <div id="receipt-header" class="text-center mb-6">
+                <h2 class="text-2xl font-extrabold text-gray-900 mb-2">MotorShop Receipt</h2>
+                <p class="text-sm text-gray-600">Date: <span id="receipt-date"></span></p>
+                <p class="text-sm text-gray-600">Time: <span id="receipt-time"></span></p>
+            </div>
+
+            <div id="receipt-customer-info" class="mb-6 border-b border-gray-300 pb-4">
+                <h3 class="text-lg font-bold text-gray-800 mb-2">Customer Details:</h3>
+                <p><strong>Name:</strong> <span id="receipt-customer-name"></span></p>
+                <p><strong>Address:</strong> <span id="receipt-customer-address"></span></p>
+                <p><strong>Contact:</strong> <span id="receipt-customer-contact"></span></p>
+            </div>
+
+            <div id="receipt-items-list" class="flex-1 overflow-y-auto mb-6 border-b border-gray-300 pb-4">
+                <h3 class="text-lg font-bold text-gray-800 mb-2">Items:</h3>
+                <!-- Receipt items will be rendered here -->
+            </div>
+
+            <div id="receipt-totals" class="mb-6">
+                <div class="flex justify-between text-lg mb-1">
+                    <span>Subtotal:</span>
+                    <span id="receipt-subtotal" class="font-semibold"></span>
+                </div>
+                <div class="flex justify-between text-lg mb-1">
+                    <span>Tax:</span>
+                    <span id="receipt-tax" class="font-semibold"></span>
+                </div>
+                <div class="flex justify-between text-xl font-bold mt-2">
+                    <span>Total:</span>
+                    <span id="receipt-total"></span>
+                </div>
+            </div>
+
+            <div class="text-center text-sm text-gray-600 mb-6">
+                <p>Thank you for your purchase!</p>
+                <p>MotorShop - Your Go-To for Motorcycle Parts</p>
+            </div>
+
+            <!-- These buttons will be hidden by print-specific CSS in the new window -->
+            <div class="flex justify-end space-x-3 print-hidden">
+                <button id="receipt-print-btn" class="px-5 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 transition duration-200">Print</button>
+                <button id="receipt-new-sale-btn" class="px-5 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-200">New Sale</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // Global Firebase objects (will be populated by the module script)
+        let firebaseApp, db, auth;
+        let userId = 'anonymous'; // Default until authenticated
+        let isFirebaseReady = false;
+
+        // Data Models - These will now be synchronized with Firestore
+        let inventory = []; // Fetched from Firestore
+        let cart = []; // Still in-memory for current transaction
+        let salesLogs = []; // Fetched from Firestore
+
+        const TAX_RATE = 0.10;
+        let productCounter = 1; // Will be determined by existing Firestore product IDs
+        let salesInvoiceCounter = 1001; // Will be determined by existing Firestore sales log IDs
+
+        // --- DOM Elements ---
+        const inventoryListEl = document.getElementById('inventory-list');
+        const cartListEl = document.getElementById('cart-list');
+        const emptyCartMessageEl = document.getElementById('empty-cart-message');
+        const subtotalEl = document.getElementById('subtotal');
+        const taxEl = document.getElementById('tax');
+        const totalEl = document.getElementById('total');
+        const inventorySearchEl = document.getElementById('inventory-search');
+        const checkoutButtonEl = document.getElementById('checkout-button');
+
+        const tabInventoryBtn = document.getElementById('tab-inventory');
+        const tabManageProductsBtn = document.getElementById('tab-manage-products');
+        const tabReportLogsBtn = document.getElementById('tab-report-logs');
+
+        const inventoryContentEl = document.getElementById('inventory-content');
+        const reportLogsContentEl = document.getElementById('report-logs-content');
+        const salesLogListEl = document.getElementById('sales-log-list');
+        const emptyLogsMessageEl = document.getElementById('empty-logs-message');
+        const inventoryLoadingEl = document.getElementById('inventory-loading'); // Loading indicator
+        const salesLogLoadingEl = document.getElementById('sales-log-loading'); // Loading indicator
+        const userIdDisplayEl = document.getElementById('user-id-display');
+
+        const messageBoxContainerEl = document.getElementById('message-box-container');
+        const messageBoxTitleEl = document.getElementById('message-box-title');
+        const messageBoxTextEl = document.getElementById('message-box-text');
+        const messageBoxOkBtn = document.getElementById('message-box-ok');
+        const messageBoxCancelBtn = document.getElementById('message-box-cancel');
+
+        const manageProductModalContainer = document.getElementById('manage-product-modal-container');
+        const manageProductModalCloseBtn = document.getElementById('manage-product-modal-close-btn');
+
+        const modalTabAddProductBtn = document.getElementById('modal-tab-add-product');
+        const modalTabRestockProductBtn = document.getElementById('modal-tab-restock-product');
+
+        const modalAddProductContent = document.getElementById('modal-add-product-content');
+        const modalRestockProductContent = document.getElementById('modal-restock-product-content');
+
+        const modalNewProductNameEl = document.getElementById('modal-new-product-name');
+        const modalNewProductPriceEl = document.getElementById('modal-new-product-price');
+        const modalNewProductStockEl = document.getElementById('modal-new-product-stock');
+        const modalNewProductRestockLevelEl = document.getElementById('modal-new-product-restock-level');
+        const modalNewProductImageEl = document.getElementById('modal-new-product-image');
+        const modalImagePreviewEl = document.getElementById('modal-image-preview');
+        const modalAddProductBtn = document.getElementById('modal-add-product-btn');
+
+        const modalRestockSearchEl = document.getElementById('modal-restock-search');
+        const modalRestockListEl = document.getElementById('modal-restock-list');
+        const modalApplyRestockBtn = document.getElementById('modal-apply-restock-btn');
+
+        const saleSummaryModalContainer = document.getElementById('sale-summary-modal-container');
+        const saleSummaryModalCloseBtn = document.getElementById('sale-summary-modal-close-btn');
+        const customerNameEl = document.getElementById('customer-name');
+        const customerAddressEl = document.getElementById('customer-address');
+        const customerContactEl = document.getElementById('customer-contact');
+        const saleSummaryItemsListEl = document.getElementById('sale-summary-items-list');
+        const summarySubtotalEl = document.getElementById('summary-subtotal');
+        const summaryTaxEl = document.getElementById('summary-tax');
+        const summaryTotalEl = document.getElementById('total'); // Corrected to use the main total element
+        const saleSummaryCancelBtn = document.getElementById('sale-summary-cancel-btn');
+        const saleSummaryCheckoutBtn = document.getElementById('sale-summary-checkout-btn');
+
+        const receiptModalContentTemplate = document.getElementById('receipt-modal-content');
+
+
+        // --- Helper Functions ---
+
+        /**
+         * Formats a number as a currency string.
+         * @param {number} amount
+         * @returns {string} Formatted currency string.
+         */
+        function formatCurrency(amount) {
+            return `$${amount.toFixed(2)}`;
+        }
+
+        /**
+         * Shows a custom message box instead of alert/confirm.
+         * @param {string} title - The title of the message box.
+         * @param {string} message - The message to display.
+         * @param {boolean} [isConfirm=false] - If true, shows OK and Cancel buttons. Otherwise, just OK.
+         * @returns {Promise<boolean>} Resolves true if OK is clicked, false if Cancel is clicked or for simple alerts.
+         */
+        function showMessageBox(title, message, isConfirm = false) {
+            return new Promise(resolve => {
+                messageBoxTitleEl.textContent = title;
+                messageBoxTextEl.textContent = message;
+                messageBoxContainerEl.classList.remove('hidden');
+
+                if (isConfirm) {
+                    messageBoxCancelBtn.classList.remove('hidden');
+                    messageBoxOkBtn.textContent = 'Confirm';
+                } else {
+                    messageBoxCancelBtn.classList.add('hidden');
+                    messageBoxOkBtn.textContent = 'OK';
+                }
+
+                const handleOk = () => {
+                    messageBoxContainerEl.classList.add('hidden');
+                    messageBoxOkBtn.removeEventListener('click', handleOk);
+                    messageBoxCancelBtn.removeEventListener('click', handleCancel);
+                    resolve(true);
+                };
+
+                const handleCancel = () => {
+                    messageBoxContainerEl.classList.add('hidden');
+                    messageBoxOkBtn.removeEventListener('click', handleOk);
+                    messageBoxCancelBtn.removeEventListener('click', handleCancel);
+                    resolve(false);
+                };
+
+                messageBoxOkBtn.addEventListener('click', handleOk);
+                messageBoxCancelBtn.addEventListener('click', handleCancel);
+            });
+        }
+
+
+        // --- Render Functions ---
+
+        /**
+         * Renders the inventory list in the left panel.
+         * @param {Array<Object>} items - The list of inventory items to display.
+         */
+        function renderInventory(items = inventory) {
+            inventoryListEl.innerHTML = ''; // Clear existing items
+
+            if (items.length === 0) {
+                inventoryListEl.innerHTML = `
+                    <p class="text-gray-400 text-center py-8">No inventory items found matching your search.</p>
+                `;
+                return;
+            }
+
+            // Sort items alphabetically by name
+            const sortedItems = [...items].sort((a, b) => a.name.localeCompare(b.name));
+
+            sortedItems.forEach(item => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = `
+                    bg-gray-800 rounded-lg p-4 mb-4 shadow-md border border-gray-700
+                    flex flex-col sm:flex-row justify-between items-center transition-all duration-200
+                    hover:scale-[1.01] hover:bg-gray-700
+                `;
+                itemDiv.innerHTML = `
+                    <div class="flex items-center gap-4 text-left mb-3 sm:mb-0">
+                        <img src="${item.imageUrl || 'https://placehold.co/80x80/555555/EEEEEE?text=No+Img'}"
+                             onerror="this.onerror=null;this.src='https://placehold.co/80x80/555555/EEEEEE?text=No+Img';"
+                             alt="${item.name}" class="w-20 h-20 rounded-md object-cover border border-gray-600">
+                        <div>
+                            <h3 class="text-xl font-semibold text-blue-300">${item.name}</h3>
+                            <p class="text-gray-400">Stock: <span class="font-medium text-gray-200">${item.stock}</span></p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <span class="text-2xl font-bold text-white">${formatCurrency(item.price)}</span>
+                        <button data-item-id="${item.id}"
+                                class="add-to-cart-btn px-4 py-2 bg-blue-600 text-white rounded-lg
+                                       hover:bg-blue-700 active:bg-blue-800 transition duration-200
+                                       shadow-md text-sm sm:text-base ${item.stock === 0 ? 'opacity-50 cursor-not-allowed' : ''}"
+                                ${item.stock === 0 ? 'disabled' : ''}>
+                            Add to Cart
+                        </button>
+                    </div>
+                `;
+                inventoryListEl.appendChild(itemDiv);
+            });
+
+            // Add event listeners for "Add to Cart" buttons
+            document.querySelectorAll('.add-to-cart-btn').forEach(button => {
+                button.addEventListener('click', async (event) => {
+                    const itemId = event.target.dataset.itemId;
+                    await addItemToCart(itemId);
+                });
+            });
+        }
+
+        /**
+         * Renders the cart list and updates totals in the right panel.
+         */
+        function renderCart() {
+            cartListEl.innerHTML = ''; // Clear existing cart items
+
+            if (cart.length === 0) {
+                emptyCartMessageEl.classList.remove('hidden');
+                checkoutButtonEl.disabled = true;
+                checkoutButtonEl.classList.add('opacity-50', 'cursor-not-allowed');
+                calculateTotals(); // Ensure totals are zeroed out
+                return;
+            } else {
+                emptyCartMessageEl.classList.add('hidden');
+                checkoutButtonEl.disabled = false;
+                checkoutButtonEl.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+
+            cart.forEach(item => {
+                const cartItemDiv = document.createElement('div');
+                cartItemDiv.className = `
+                    bg-gray-900 rounded-lg p-4 mb-3 shadow-sm border border-gray-700
+                    flex flex-col sm:flex-row justify-between items-center transition-all duration-200
+                    hover:scale-[1.01] hover:bg-gray-900/90
+                `;
+                cartItemDiv.innerHTML = `
+                    <div class="flex items-center gap-4 text-left mb-3 sm:mb-0">
+                        <img src="${item.imageUrl || 'https://placehold.co/60x60/444444/DDDDDD?text=No+Img'}"
+                             onerror="this.onerror=null;this.src='https://placehold.co/60x60/444444/DDDDDD?text=No+Img';"
+                             alt="${item.name}" class="w-16 h-16 rounded-md object-cover border border-gray-600">
+                        <div>
+                            <h3 class="text-xl font-semibold text-blue-300">${item.name}</h3>
+                            <p class="text-gray-400">Price: ${formatCurrency(item.price)}</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <button data-item-id="${item.id}" data-change="-1"
+                                class="quantity-btn px-3 py-1 bg-gray-700 text-white rounded-md
+                                       hover:bg-gray-600 active:bg-gray-800 transition duration-200
+                                       shadow-md text-sm sm:text-base">-</button>
+                        <span class="text-xl font-bold text-white">${item.quantity}</span>
+                        <button data-item-id="${item.id}" data-change="1"
+                                class="quantity-btn px-3 py-1 bg-gray-700 text-white rounded-md
+                                       hover:bg-gray-600 active:bg-gray-800 transition duration-200
+                                       shadow-md text-sm sm:text-base">+</button>
+                        <span class="text-xl font-bold text-white w-24 text-right">${formatCurrency(item.price * item.quantity)}</span>
+                        <button data-item-id="${item.id}"
+                                class="remove-from-cart-btn px-3 py-1 bg-red-600 text-white rounded-md
+                                       hover:bg-red-700 active:bg-red-800 transition duration-200
+                                       shadow-md text-sm sm:text-base">X</button>
+                    </div>
+                `;
+                cartListEl.appendChild(cartItemDiv);
+            });
+
+            // Add event listeners for quantity and remove buttons
+            document.querySelectorAll('.quantity-btn').forEach(button => {
+                button.addEventListener('click', async (event) => {
+                    const itemId = event.target.dataset.itemId;
+                    const change = parseInt(event.target.dataset.change);
+                    await updateCartQuantity(itemId, change);
+                });
+            });
+
+            document.querySelectorAll('.remove-from-cart-btn').forEach(button => {
+                button.addEventListener('click', async (event) => {
+                    const itemId = event.target.dataset.itemId;
+                    await removeItemFromCart(itemId);
+                });
+            });
+
+            calculateTotals();
+        }
+
+        /**
+         * Renders the restock list in the "Restock Product" tab within the modal.
+         * @param {Array<Object>} items - The list of inventory items to display for restock.
+         */
+        function renderModalRestockList(items = inventory) {
+            modalRestockListEl.innerHTML = ''; // Clear existing items
+
+            const searchTerm = modalRestockSearchEl.value.toLowerCase().trim();
+            const filteredItems = items.filter(item =>
+                item.name.toLowerCase().includes(searchTerm)
+            );
+
+            if (filteredItems.length === 0) {
+                modalRestockListEl.innerHTML = `
+                    <p class="text-gray-400 text-center py-8">No products found matching your search for restock.</p>
+                `;
+                return;
+            }
+
+            // Sort items alphabetically by name for restock list
+            const sortedItems = [...filteredItems].sort((a, b) => a.name.localeCompare(b.name));
+
+            sortedItems.forEach(item => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = `
+                    bg-gray-900 rounded-lg p-4 mb-3 shadow-sm border border-gray-700
+                    flex flex-col sm:flex-row justify-between items-center transition-all duration-200
+                    hover:scale-[1.01] hover:bg-gray-900/90
+                `;
+                itemDiv.innerHTML = `
+                    <div class="flex items-center gap-4 text-left mb-3 sm:mb-0 flex-1">
+                        <img src="${item.imageUrl || 'https://placehold.co/60x60/444444/DDDDDD?text=No+Img'}"
+                             onerror="this.onerror=null;this.src='https://placehold.co/60x60/444444/DDDDDD?text=No+Img';"
+                             alt="${item.name}" class="w-16 h-16 rounded-md object-cover border border-gray-600">
+                        <div>
+                            <h3 class="text-xl font-semibold text-blue-300">${item.name}</h3>
+                            <p class="text-gray-400">Current Stock: <span class="font-medium text-gray-200">${item.stock}</span></p>
+                            <p class="text-gray-500 text-sm">Restock Level: <span class="font-medium text-gray-400">${item.restockLevel || 'N/A'}</span></p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-3 w-32 sm:w-48">
+                        <label for="modal-restock-qty-${item.id}" class="sr-only">Quantity for ${item.name}</label>
+                        <input type="number" id="modal-restock-qty-${item.id}" data-item-id="${item.id}" min="0" value="0"
+                               class="restock-quantity-input w-full p-2 rounded-md bg-gray-700 border border-gray-600
+                                      text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                    </div>
+                `;
+                modalRestockListEl.appendChild(itemDiv);
+            });
+        }
+
+        /**
+         * Renders the items list within the Sale Summary modal.
+         */
+        function renderSaleSummaryItems() {
+            saleSummaryItemsListEl.innerHTML = '';
+            if (cart.length === 0) {
+                saleSummaryItemsListEl.innerHTML = '<p class="text-gray-400 text-center py-4">No items in cart.</p>';
+                return;
+            }
+            cart.forEach(item => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = `
+                    flex justify-between items-center py-2 border-b border-gray-800 last:border-b-0
+                `;
+                itemDiv.innerHTML = `
+                    <span class="text-gray-200">${item.name} (x${item.quantity})</span>
+                    <span class="text-white font-semibold">${formatCurrency(item.price * item.quantity)}</span>
+                `;
+                saleSummaryItemsListEl.appendChild(itemDiv);
+            });
+        }
+
+        /**
+         * Renders the sales log list in the Report Logs section.
+         */
+        function renderReportLogs() {
+            salesLogListEl.innerHTML = ''; // Clear existing logs
+
+            if (salesLogs.length === 0) {
+                emptyLogsMessageEl.classList.remove('hidden');
+                return;
+            } else {
+                emptyLogsMessageEl.classList.add('hidden');
+            }
+
+            // Sort logs by timestamp, newest first
+            const sortedLogs = [...salesLogs].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+            sortedLogs.forEach(log => {
+                const logDate = new Date(log.timestamp).toLocaleDateString();
+                const logTime = new Date(log.timestamp).toLocaleTimeString();
+
+                const logItemDiv = document.createElement('div');
+                logItemDiv.className = `
+                    bg-gray-800 rounded-lg p-4 mb-4 shadow-md border border-gray-700
+                    flex flex-col sm:flex-row justify-between items-center transition-all duration-200
+                    hover:scale-[1.01] hover:bg-gray-700
+                `;
+                logItemDiv.innerHTML = `
+                    <div class="flex-1 text-left mb-2 sm:mb-0">
+                        <p class="text-gray-300 text-sm">Invoice ID:
+                            <span class="sales-invoice-id font-bold text-blue-400 cursor-pointer hover:underline"
+                                  data-invoice-id="${log.salesInvoiceId}">${log.salesInvoiceId}</span>
+                        </p>
+                        <p class="text-gray-400 text-sm">Date: ${logDate} | Time: ${logTime}</p>
+                        <p class="text-gray-200 font-semibold">Customer: ${log.customer.name}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-2xl font-bold text-white">${formatCurrency(log.total)}</p>
+                    </div>
+                `;
+                salesLogListEl.appendChild(logItemDiv);
+            });
+
+            // Add event listeners to the clickable invoice IDs
+            document.querySelectorAll('.sales-invoice-id').forEach(span => {
+                span.addEventListener('click', (event) => {
+                    const invoiceId = event.target.dataset.invoiceId;
+                    const selectedLog = salesLogs.find(log => log.salesInvoiceId === invoiceId);
+                    if (selectedLog) {
+                        openReceiptForPrinting(selectedLog); // Pass the entire log object
+                    } else {
+                        showMessageBox('Error', 'Sales record not found.');
+                    }
+                });
+            });
+        }
+
+
+        /**
+         * Renders the receipt details into the hidden template.
+         * @param {Object} saleData - The sale data to render (can be currentSale or a historical salesLog).
+         */
+        function renderReceipt(saleData) {
+            // Populate the hidden receipt modal content template
+            const saleDateTime = new Date(saleData.timestamp);
+            receiptModalContentTemplate.querySelector('#receipt-date').textContent = saleDateTime.toLocaleDateString();
+            receiptModalContentTemplate.querySelector('#receipt-time').textContent = saleDateTime.toLocaleTimeString();
+
+            receiptModalContentTemplate.querySelector('#receipt-customer-name').textContent = saleData.customer.name || 'N/A';
+            receiptModalContentTemplate.querySelector('#receipt-customer-address').textContent = saleData.customer.address || 'N/A';
+            receiptModalContentTemplate.querySelector('#receipt-customer-contact').textContent = saleData.customer.contact || 'N/A';
+
+            const receiptItemsListEl = receiptModalContentTemplate.querySelector('#receipt-items-list');
+            receiptItemsListEl.innerHTML = '<h3 class="text-lg font-bold text-gray-800 mb-2">Items:</h3>'; // Clear and add heading
+            saleData.items.forEach(item => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = `
+                    flex justify-between items-center py-1 border-b border-gray-200 last:border-b-0
+                `;
+                itemDiv.innerHTML = `
+                    <span class="text-gray-700">${item.name} x ${item.quantity}</span>
+                    <span class="font-semibold text-gray-800">${formatCurrency(item.price * item.quantity)}</span>
+                `;
+                receiptItemsListEl.appendChild(itemDiv);
+            });
+
+            receiptModalContentTemplate.querySelector('#receipt-subtotal').textContent = formatCurrency(saleData.subtotal);
+            receiptModalContentTemplate.querySelector('#receipt-tax').textContent = formatCurrency(saleData.tax);
+            receiptModalContentTemplate.querySelector('#receipt-total').textContent = formatCurrency(saleData.total);
+        }
+
+
+        /**
+         * Calculates subtotal, tax, and total based on cart items and updates the display.
+         */
+        function calculateTotals() {
+            let subtotal = 0;
+            cart.forEach(item => {
+                subtotal += item.price * item.quantity;
+            });
+
+            const tax = subtotal * TAX_RATE;
+            const total = subtotal + tax;
+
+            subtotalEl.textContent = formatCurrency(subtotal);
+            taxEl.textContent = formatCurrency(tax);
+            totalEl.textContent = formatCurrency(total);
+
+            // Also update summary modal totals (using totalEl which is already updated)
+            // summarySubtotalEl.textContent = formatCurrency(subtotal); // Already updated via subtotalEl.textContent
+            // summaryTaxEl.textContent = formatCurrency(tax); // Already updated via taxEl.textContent
+            // summaryTotalEl.textContent = formatCurrency(total); // Already updated via totalEl.textContent
+        }
+
+        // --- Cart Management Logic ---
+
+        /**
+         * Adds an item to the cart or increments its quantity if already present.
+         * Also updates inventory stock in Firestore.
+         * @param {string} itemId - The ID of the item to add.
+         */
+        async function addItemToCart(itemId) {
+            if (!isFirebaseReady) {
+                showMessageBox('Loading', 'Please wait while the system is initializing...');
+                return;
+            }
+            try {
+                const itemDocRef = firebase.doc(db, `artifacts/${__app_id}/public/data/inventory`, itemId);
+                const itemDocSnap = await firebase.getDoc(itemDocRef);
+
+                if (!itemDocSnap.exists()) {
+                    showMessageBox('Error', 'Item not found in inventory.');
+                    return;
+                }
+
+                const inventoryItem = { id: itemDocSnap.id, ...itemDocSnap.data() };
+
+                if (inventoryItem.stock <= 0) {
+                    showMessageBox('Out of Stock', 'This item is currently out of stock.');
+                    return;
+                }
+
+                const cartItem = cart.find(item => item.id === itemId);
+
+                if (cartItem) {
+                    if (inventoryItem.stock > 0) { // Check inventory stock again
+                        cartItem.quantity++;
+                        inventoryItem.stock--; // Update local inventory item for immediate visual update
+                        await firebase.updateDoc(itemDocRef, { stock: inventoryItem.stock });
+                    } else {
+                        showMessageBox('Stock Limit Reached', `You have added all available ${inventoryItem.name} items to your cart.`);
+                    }
+                } else {
+                    cart.push({
+                        id: inventoryItem.id,
+                        name: inventoryItem.name,
+                        price: inventoryItem.price,
+                        quantity: 1,
+                        imageUrl: inventoryItem.imageUrl
+                    });
+                    inventoryItem.stock--; // Update local inventory item
+                    await firebase.updateDoc(itemDocRef, { stock: inventoryItem.stock });
+                }
+                renderCart(); // Cart rendering depends on the local `cart` array
+            } catch (error) {
+                console.error("Error adding item to cart:", error);
+                showMessageBox('Error', 'Failed to add item to cart. Please try again.');
+            }
+        }
+
+        /**
+         * Updates the quantity of an item in the cart and in Firestore.
+         * @param {string} itemId - The ID of the item.
+         * @param {number} change - The amount to change the quantity by (+1 or -1).
+         */
+        async function updateCartQuantity(itemId, change) {
+            if (!isFirebaseReady) {
+                showMessageBox('Loading', 'Please wait while the system is initializing...');
+                return;
+            }
+            try {
+                const cartItem = cart.find(item => item.id === itemId);
+                if (!cartItem) return;
+
+                const itemDocRef = firebase.doc(db, `artifacts/${__app_id}/public/data/inventory`, itemId);
+                const itemDocSnap = await firebase.getDoc(itemDocRef);
+                if (!itemDocSnap.exists()) {
+                    showMessageBox('Error', 'Item not found in inventory for quantity update.');
+                    return;
+                }
+                const inventoryItem = { id: itemDocSnap.id, ...itemDocSnap.data() };
+
+                let newStock = inventoryItem.stock;
+                let newCartQuantity = cartItem.quantity;
+
+                if (change === 1) { // Increase quantity
+                    if (newStock > 0) {
+                        newCartQuantity++;
+                        newStock--;
+                    } else {
+                        showMessageBox('Stock Limit Reached', `Cannot add more ${inventoryItem.name}. All available stock is in your cart.`);
+                    }
+                } else if (change === -1) { // Decrease quantity
+                    if (newCartQuantity > 1) {
+                        newCartQuantity--;
+                        newStock++;
+                    } else {
+                        // If quantity becomes 0, remove item from cart
+                        await removeItemFromCart(itemId);
+                        return; // Exit to avoid re-rendering twice
+                    }
+                }
+
+                // Update Firestore and local cart
+                await firebase.updateDoc(itemDocRef, { stock: newStock });
+                cartItem.quantity = newCartQuantity; // Update local cart item
+                renderCart();
+            } catch (error) {
+                console.error("Error updating cart quantity:", error);
+                showMessageBox('Error', 'Failed to update item quantity. Please try again.');
+            }
+        }
+
+        /**
+         * Removes an item completely from the cart and returns stock to inventory in Firestore.
+         * @param {string} itemId - The ID of the item to remove.
+         */
+        async function removeItemFromCart(itemId) {
+            if (!isFirebaseReady) {
+                showMessageBox('Loading', 'Please wait while the system is initializing...');
+                return;
+            }
+            try {
+                const itemIndex = cart.findIndex(item => item.id === itemId);
+                if (itemIndex > -1) {
+                    const removedItem = cart[itemIndex];
+                    const itemDocRef = firebase.doc(db, `artifacts/${__app_id}/public/data/inventory`, itemId);
+                    const itemDocSnap = await firebase.getDoc(itemDocRef);
+                    if (itemDocSnap.exists()) {
+                        const inventoryItem = { id: itemDocSnap.id, ...itemDocSnap.data() };
+                        const newStock = inventoryItem.stock + removedItem.quantity;
+                        await firebase.updateDoc(itemDocRef, { stock: newStock });
+                    }
+                    cart.splice(itemIndex, 1); // Remove item from local cart array
+                }
+                renderCart();
+            } catch (error) {
+                console.error("Error removing item from cart:", error);
+                showMessageBox('Error', 'Failed to remove item from cart. Please try again.');
+            }
+        }
+
+        /**
+         * Initiates the checkout process by opening the sale summary modal.
+         */
+        async function initiateCheckout() {
+            if (cart.length === 0) {
+                showMessageBox('Cart Empty', 'Please add items to the cart before checking out.');
+                return;
+            }
+
+            openSaleSummaryModal();
+        }
+
+        /**
+         * Filters the inventory based on the search input.
+         * @returns {Array<Object>} Filtered inventory items.
+         */
+        function getFilteredInventory() {
+            const searchTerm = inventorySearchEl.value.toLowerCase().trim();
+            if (!searchTerm) {
+                return inventory; // `inventory` is now kept in sync by Firestore listener
+            }
+            return inventory.filter(item =>
+                item.name.toLowerCase().includes(searchTerm)
+            );
+        }
+
+        // --- Management Functions (used within modal) ---
+
+        /**
+         * Handles adding a new product to the inventory in Firestore.
+         */
+        async function addNewProduct() {
+            if (!isFirebaseReady) {
+                showMessageBox('Loading', 'Please wait while the system is initializing...');
+                return;
+            }
+            const name = modalNewProductNameEl.value.trim();
+            const price = parseFloat(modalNewProductPriceEl.value);
+            const stock = parseInt(modalNewProductStockEl.value);
+            const restockLevel = parseInt(modalNewProductRestockLevelEl.value);
+
+            if (!name || isNaN(price) || price <= 0 || isNaN(stock) || stock < 0 || isNaN(restockLevel) || restockLevel < 0) {
+                showMessageBox('Input Error', 'Please enter valid product name, price (>0), stock (>=0), and restock level (>=0).');
+                return;
+            }
+
+            let imageUrl = '';
+            if (modalNewProductImageEl.files.length > 0) {
+                const file = modalNewProductImageEl.files[0];
+                try {
+                    imageUrl = await new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve(reader.result);
+                        reader.onerror = error => reject(error);
+                        reader.readAsDataURL(file);
+                    });
+                } catch (error) {
+                    console.error("Error reading image file:", error);
+                    showMessageBox('Image Error', 'Could not read image file. Please try again.');
+                    return;
+                }
+            }
+
+            // Generate a new unique ID for the product
+            const newProductId = 'item-' + String(productCounter++).padStart(3, '0');
+            const newProductData = {
+                name: name,
+                price: price,
+                stock: stock,
+                restockLevel: restockLevel,
+                imageUrl: imageUrl
+            };
+
+            try {
+                // Add the new product to Firestore with the generated ID as document ID
+                const docRef = firebase.doc(db, `artifacts/${__app_id}/public/data/inventory`, newProductId);
+                await firebase.setDoc(docRef, newProductData);
+
+                modalNewProductNameEl.value = '';
+                modalNewProductPriceEl.value = '';
+                modalNewProductStockEl.value = '';
+                modalNewProductRestockLevelEl.value = '10'; // Reset to default
+                modalNewProductImageEl.value = ''; // Clear file input
+                modalImagePreviewEl.classList.add('hidden'); // Hide preview
+
+                showMessageBox('Product Added', `${name} has been added to inventory.`);
+                closeManageProductModal();
+            } catch (error) {
+                console.error("Error adding new product to Firestore:", error);
+                showMessageBox('Error', 'Failed to add new product. Please try again.');
+            }
+        }
+
+        /**
+         * Handles applying restock quantities to multiple products in Firestore.
+         */
+        async function applyRestock() {
+            if (!isFirebaseReady) {
+                showMessageBox('Loading', 'Please wait while the system is initializing...');
+                return;
+            }
+            const restockInputs = document.querySelectorAll('#modal-restock-list .restock-quantity-input');
+            let restockedCount = 0;
+            let totalRestockedUnits = 0;
+            const updates = [];
+
+            restockInputs.forEach(input => {
+                const itemId = input.dataset.itemId;
+                const quantity = parseInt(input.value);
+                const inventoryItem = inventory.find(item => item.id === itemId);
+
+                if (inventoryItem && !isNaN(quantity) && quantity > 0) {
+                    const itemDocRef = firebase.doc(db, `artifacts/${__app_id}/public/data/inventory`, itemId);
+                    updates.push(firebase.updateDoc(itemDocRef, { stock: inventoryItem.stock + quantity }));
+                    restockedCount++;
+                    totalRestockedUnits += quantity;
+                    input.value = '0'; // Reset input field
+                }
+            });
+
+            if (restockedCount > 0) {
+                try {
+                    await Promise.all(updates); // Execute all updates concurrently
+                    showMessageBox('Restock Complete', `Successfully restocked ${restockedCount} product(s) with a total of ${totalRestockedUnits} units.`);
+                    closeManageProductModal();
+                } catch (error) {
+                    console.error("Error applying restock:", error);
+                    showMessageBox('Error', 'Failed to apply restock. Please try again.');
+                }
+            } else {
+                showMessageBox('No Restock Applied', 'Please enter a valid positive quantity for at least one item to restock.');
+            }
+        }
+
+
+        // --- Main Tab Switching Logic ---
+
+        /**
+         * Switches the active main tab and displays the corresponding content.
+         * @param {string} tabName - The name of the tab to activate ('inventory', 'manage-products', 'report-logs').
+         */
+        function switchMainTab(tabName) {
+            // Hide all main content divs
+            inventoryContentEl.classList.add('hidden');
+            reportLogsContentEl.classList.add('hidden'); // Hide report logs
+
+            // Deactivate all main tab buttons
+            tabInventoryBtn.classList.remove('active');
+            tabManageProductsBtn.classList.remove('active');
+            tabReportLogsBtn.classList.remove('active'); // Deactivate report logs button
+
+            // Show relevant content and activate relevant button
+            if (tabName === 'inventory') {
+                inventoryContentEl.classList.remove('hidden');
+                tabInventoryBtn.classList.add('active');
+                // Inventory rendering is handled by the onSnapshot listener
+            } else if (tabName === 'manage-products') {
+                // Do not show a content div here, instead open the modal
+                tabManageProductsBtn.classList.add('active');
+                openManageProductModal();
+            } else if (tabName === 'report-logs') {
+                reportLogsContentEl.classList.remove('hidden'); // Show report logs
+                tabReportLogsBtn.classList.add('active'); // Activate report logs button
+                // Sales log rendering is handled by the onSnapshot listener
+            }
+        }
+
+        // --- Modal Control Functions ---
+
+        /**
+         * Opens the "Manage Products" modal.
+         */
+        function openManageProductModal() {
+            manageProductModalContainer.classList.remove('hidden');
+            switchModalTab('add-product'); // Default to 'Add Product' tab inside modal
+        }
+
+        /**
+         * Closes the "Manage Products" modal.
+         */
+        function closeManageProductModal() {
+            manageProductModalContainer.classList.add('hidden');
+            // Clear Add Product form fields
+            modalNewProductNameEl.value = '';
+            modalNewProductPriceEl.value = '';
+            modalNewProductStockEl.value = '';
+            modalNewProductRestockLevelEl.value = '10'; // Reset to default
+            modalNewProductImageEl.value = ''; // Clear file input
+            modalImagePreviewEl.classList.add('hidden'); // Hide preview
+
+            // Clear restock search and re-render restock list in case modal is opened again
+            modalRestockSearchEl.value = '';
+            // No need to call renderModalRestockList here, it will be called when tab is opened
+            switchMainTab('inventory'); // Re-activate the Inventory tab in the main view
+        }
+
+        /**
+         * Switches the active tab inside the "Manage Products" modal.
+         * @param {string} tabName - The name of the modal tab to activate ('add-product', 'restock-product').
+         */
+        function switchModalTab(tabName) {
+            // Hide all modal content divs
+            modalAddProductContent.classList.add('hidden');
+            modalRestockProductContent.classList.add('hidden');
+
+            // Deactivate all modal tab buttons
+            modalTabAddProductBtn.classList.remove('active');
+            modalTabRestockProductBtn.classList.remove('active');
+
+            // Show relevant modal content and activate relevant modal button
+            if (tabName === 'add-product') {
+                modalAddProductContent.classList.remove('hidden');
+                modalTabAddProductBtn.classList.add('active');
+            } else if (tabName === 'restock-product') {
+                modalRestockProductContent.classList.remove('hidden');
+                modalTabRestockProductBtn.classList.add('active');
+                renderModalRestockList(); // Render restock list every time this tab is opened
+            }
+        }
+
+        /**
+         * Opens the Sale Summary modal.
+         */
+        function openSaleSummaryModal() {
+            saleSummaryModalContainer.classList.remove('hidden');
+            renderSaleSummaryItems();
+            calculateTotals(); // Ensure totals are up-to-date in summary modal
+        }
+
+        /**
+         * Closes the Sale Summary modal.
+         */
+        function closeSaleSummaryModal() {
+            saleSummaryModalContainer.classList.add('hidden');
+            // Optionally clear customer info fields here if desired
+            customerNameEl.value = '';
+            customerAddressEl.value = '';
+            customerContactEl.value = '';
+        }
+
+        /**
+         * Finalizes the sale and adds it to Firestore sales logs.
+         */
+        async function finalizeSale() {
+            if (!isFirebaseReady) {
+                showMessageBox('Loading', 'Please wait while the system is initializing...');
+                return;
+            }
+            const customerName = customerNameEl.value.trim();
+            const customerAddress = customerAddressEl.value.trim();
+            const customerContact = customerContactEl.value.trim();
+
+            if (!customerName || !customerAddress || !customerContact) {
+                showMessageBox('Customer Info Required', 'Please fill in all customer details (Name, Address, Contact No.) before checking out.');
+                return;
+            }
+
+            const confirmed = await showMessageBox(
+                'Confirm Final Checkout',
+                `Proceed with checkout for ${summaryTotalEl.textContent}?`,
+                true
+            );
+
+            if (confirmed) {
+                try {
+                    // Generate a unique sales invoice ID
+                    const salesInvoiceId = `INV-${salesInvoiceCounter++}-${Date.now().toString().slice(-4)}`;
+
+                    // Create a copy of the current sale data
+                    const completedSale = {
+                        salesInvoiceId: salesInvoiceId,
+                        customer: {
+                            name: customerName,
+                            address: customerAddress,
+                            contact: customerContact
+                        },
+                        items: JSON.parse(JSON.stringify(cart)), // Deep copy cart items
+                        subtotal: parseFloat(subtotalEl.textContent.replace('$', '')),
+                        tax: parseFloat(taxEl.textContent.replace('$', '')),
+                        total: parseFloat(totalEl.textContent.replace('$', '')),
+                        timestamp: new Date().toISOString() // Store timestamp for sorting and display
+                    };
+
+                    // Add the completed sale to Firestore
+                    await firebase.addDoc(firebase.collection(db, `artifacts/${__app_id}/public/data/salesLogs`), completedSale);
+
+                    // Clear the cart for a new sale
+                    cart = [];
+                    renderCart(); // Update cart display
+
+                    closeSaleSummaryModal();
+                    openReceiptForPrinting(completedSale); // Pass the completed sale object for printing
+                } catch (error) {
+                    console.error("Error finalizing sale or adding to logs:", error);
+                    showMessageBox('Error', 'Failed to finalize sale. Please try again.');
+                }
+            }
+        }
+
+        /**
+         * Opens a new window, renders the receipt content into it, and triggers print.
+         * @param {Object} saleData - The sale data (can be currentSale or a historical salesLog) to print.
+         */
+        function openReceiptForPrinting(saleData) {
+            renderReceipt(saleData); // First, update the hidden template with the provided sale data
+
+            const printWindow = window.open('', '_blank', 'width=800,height=600');
+            if (!printWindow) {
+                showMessageBox('Print Error', 'Please allow pop-ups for this site to print the receipt.');
+                return;
+            }
+
+            // Get the content of the receipt template
+            const receiptContent = receiptModalContentTemplate.innerHTML;
+
+            // Construct the HTML for the new print window
+            const printHtml = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>MotorShop Receipt</title>
+                    <style>
+                        body {
+                            font-family: 'Inter', sans-serif;
+                            margin: 0;
+                            padding: 20px;
+                            color: #000; /* Black text for printing */
+                            background-color: #fff; /* White background for printing */
+                            display: flex;
+                            justify-content: center;
+                            align-items: flex-start;
+                            min-height: 100vh;
+                        }
+                        #receipt-content-in-print {
+                            width: 80mm; /* Standard receipt width */
+                            max-width: 100%;
+                            padding: 10mm;
+                            box-sizing: border-box;
+                            border: none;
+                            box-shadow: none;
+                            display: block;
+                        }
+                        .text-center { text-align: center; }
+                        .mb-6 { margin-bottom: 1.5rem; }
+                        .mb-2 { margin-bottom: 0.5rem; }
+                        .text-2xl { font-size: 1.5rem; }
+                        .font-extrabold { font-weight: 800; }
+                        .text-gray-900 { color: #1a202c; }
+                        .text-sm { font-size: 0.875rem; }
+                        .text-gray-600 { color: #4a5568; }
+                        .mb-6 { margin-bottom: 1.5rem; }
+                        .border-b { border-bottom-width: 1px; }
+                        .border-gray-300 { border-color: #e2e8f0; }
+                        .pb-4 { padding-bottom: 1rem; }
+                        .text-lg { font-size: 1.125rem; }
+                        .font-bold { font-weight: 700; }
+                        .text-gray-800 { color: #2d3748; }
+                        p { margin-bottom: 0.5rem; }
+                        .flex { display: flex; }
+                        .justify-between { justify-content: space-between; }
+                        .items-center { align-items: center; }
+                        .py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+                        .font-semibold { font-weight: 600; }
+                        .mt-2 { margin-top: 0.5rem; }
+                        .text-xl { font-size: 1.25rem; }
+                        .print-hidden { display: none !important; } /* Hide buttons in print view */
+
+                        /* Specific overrides to ensure black text and white background for print */
+                        #receipt-content-in-print h2, #receipt-content-in-print h3,
+                        #receipt-content-in-print p, #receipt-content-in-print span,
+                        #receipt-content-in-print strong {
+                            color: #000 !important;
+                        }
+                        #receipt-content-in-print {
+                            background-color: #fff !important;
+                        }
+                        #receipt-content-in-print .border-b, #receipt-content-in-print .border-gray-200, #receipt-content-in-print .border-gray-300 {
+                            border-color: #bbb !important; /* Lighter borders for print */
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div id="receipt-content-in-print">
+                        ${receiptContent}
+                    </div>
+                </body>
+                </html>
+            `;
+
+            printWindow.document.write(printHtml);
+            printWindow.document.close(); // Close the document to ensure content is loaded
+
+            // Use onload to ensure content is rendered before printing
+            printWindow.onload = () => {
+                printWindow.focus(); // Focus the new window
+                printWindow.print(); // Open the print dialog
+                // Set a timeout to close the window after print dialog is handled
+                setTimeout(() => {
+                    printWindow.close();
+                    // When printing from reports, we don't clear the main app's cart.
+                    // We only want to reset the main app's state if we just completed a new sale.
+                    // This logic is now handled in `finalizeSale`.
+                }, 500); // Small delay to ensure print dialog appears before closing
+            };
+        }
+
+
+        // --- Firestore Listeners ---
+        let inventoryUnsubscribe;
+        let salesLogsUnsubscribe;
+
+        // Function to set up Firestore listeners (called after Firebase is ready)
+        function setupFirestoreListeners() {
+            if (!isFirebaseReady) return;
+
+            // Reference to the public inventory collection
+            const inventoryCollectionRef = firebase.collection(db, `artifacts/${__app_id}/public/data/inventory`);
+            // Reference to the public sales logs collection
+            const salesLogsCollectionRef = firebase.collection(db, `artifacts/${__app_id}/public/data/salesLogs`);
+
+            // Inventory Listener
+            inventoryLoadingEl.classList.remove('hidden');
+            inventoryUnsubscribe = firebase.onSnapshot(inventoryCollectionRef, async (snapshot) => {
+                const fetchedInventory = [];
+                snapshot.forEach(doc => {
+                    fetchedInventory.push({ id: doc.id, ...doc.data() });
+                });
+                inventory = fetchedInventory; // Update global inventory array
+                renderInventory(getFilteredInventory()); // Re-render current view with new data
+                inventoryLoadingEl.classList.add('hidden');
+
+                // If inventory is empty, populate it with initial data (one-time operation)
+                if (inventory.length === 0) {
+                    const initialData = [
+                        { id: 'item-001', name: 'Spark Plug (Iridium)', price: 12.99, stock: 150, restockLevel: 20, imageUrl: 'https://placehold.co/80x80/000000/FFFFFF?text=Plug' },
+                        { id: 'item-002', name: 'Engine Oil (Synthetic)', price: 35.50, stock: 80, restockLevel: 15, imageUrl: 'https://placehold.co/80x80/000000/FFFFFF?text=Oil' },
+                        { id: 'item-003', name: 'Brake Pad Set (Front)', price: 59.95, stock: 60, restockLevel: 10, imageUrl: 'https://placehold.co/80x80/000000/FFFFFF?text=Brake' },
+                        { id: 'item-004', name: 'Oil Filter (Premium)', price: 8.75, stock: 200, restockLevel: 25, imageUrl: 'https://placehold.co/80x80/000000/FFFFFF?text=Filter' },
+                        { id: 'item-005', name: 'Air Filter (Performance)', price: 25.00, stock: 90, restockLevel: 15, imageUrl: 'https://placehold.co/80x80/000000/FFFFFF?text=Air' },
+                        { id: 'item-006', name: 'Tire (Sport Touring)', price: 180.00, stock: 40, restockLevel: 5, imageUrl: 'https://placehold.co/80x80/000000/FFFFFF?text=Tire' },
+                        { id: 'item-007', name: 'Chain Lube (Heavy Duty)', price: 9.99, stock: 120, restockLevel: 20, imageUrl: 'https://placehold.co/80x80/000000/FFFFFF?text=Lube' },
+                        { id: 'item-008', name: 'Battery (Maintenance Free)', price: 85.00, stock: 30, restockLevel: 8, imageUrl: 'https://placehold.co/80x80/000000/FFFFFF?text=Battery' },
+                        { id: 'item-009', name: 'Headlight Bulb (LED)', price: 22.50, stock: 75, restockLevel: 10, imageUrl: 'https://placehold.co/80x80/000000/FFFFFF?text=Bulb' },
+                        { id: 'item-010', name: 'Mirror Set (Custom)', price: 45.00, stock: 25, restockLevel: 5, imageUrl: 'https://placehold.co/80x80/000000/FFFFFF?text=Mirror' },
+                        { id: 'item-011', name: 'Helmet (Full Face)', price: 199.99, stock: 15, restockLevel: 3, imageUrl: 'https://placehold.co/80x80/000000/FFFFFF?text=Helmet' },
+                        { id: 'item-012', name: 'Jacket (Riding Gear)', price: 150.00, stock: 20, restockLevel: 5, imageUrl: 'https://placehold.co/80x80/000000/FFFFFF?text=Jacket' },
+                    ];
+                    // Add initial data if the collection is truly empty
+                    const existingDocs = await firebase.getDocs(inventoryCollectionRef);
+                    if (existingDocs.empty) {
+                        for (const item of initialData) {
+                            try {
+                                await firebase.setDoc(firebase.doc(db, `artifacts/${__app_id}/public/data/inventory`, item.id), item);
+                            } catch (e) {
+                                console.error("Error setting initial inventory item:", item.id, e);
+                            }
+                        }
+                    }
+                }
+            }, (error) => {
+                console.error("Error listening to inventory:", error);
+                showMessageBox('Data Error', 'Failed to load inventory data. Please check your connection and try again.');
+                inventoryLoadingEl.classList.add('hidden');
+            });
+
+            // Sales Logs Listener
+            salesLogLoadingEl.classList.remove('hidden');
+            salesLogsUnsubscribe = firebase.onSnapshot(salesLogsCollectionRef, (snapshot) => {
+                const fetchedSalesLogs = [];
+                snapshot.forEach(doc => {
+                    fetchedSalesLogs.push({ id: doc.id, ...doc.data() });
+                });
+                salesLogs = fetchedSalesLogs; // Update global salesLogs array
+                renderReportLogs(); // Re-render the report logs
+                salesLogLoadingEl.classList.add('hidden');
+
+                // Update salesInvoiceCounter to ensure unique new IDs
+                if (salesLogs.length > 0) {
+                    const maxInvoiceNum = salesLogs.reduce((max, log) => {
+                        const match = log.salesInvoiceId ? log.salesInvoiceId.match(/INV-(\d+)/) : null;
+                        return match ? Math.max(max, parseInt(match[1])) : max;
+                    }, 1000); // Start from 1000 if no logs
+                    salesInvoiceCounter = maxInvoiceNum + 1;
+                }
+            }, (error) => {
+                console.error("Error listening to sales logs:", error);
+                showMessageBox('Data Error', 'Failed to load sales log data. Please check your connection and try again.');
+                salesLogLoadingEl.classList.add('hidden');
+            });
+        }
+
+
+        // --- Event Listeners ---
+        inventorySearchEl.addEventListener('input', () => {
+            renderInventory(getFilteredInventory());
+        });
+
+        checkoutButtonEl.addEventListener('click', initiateCheckout);
+
+        // Main Tab button event listeners
+        tabInventoryBtn.addEventListener('click', () => switchMainTab('inventory'));
+        tabManageProductsBtn.addEventListener('click', () => switchMainTab('manage-products'));
+        tabReportLogsBtn.addEventListener('click', () => switchMainTab('report-logs'));
+
+        // Manage Products Modal event listeners
+        manageProductModalCloseBtn.addEventListener('click', closeManageProductModal);
+        modalTabAddProductBtn.addEventListener('click', () => switchModalTab('add-product'));
+        modalTabRestockProductBtn.addEventListener('click', () => switchModalTab('restock-product'));
+        modalAddProductBtn.addEventListener('click', addNewProduct);
+        modalNewProductImageEl.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    modalImagePreviewEl.src = e.target.result;
+                    modalImagePreviewEl.classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            } else {
+                modalImagePreviewEl.src = '';
+                modalImagePreviewEl.classList.add('hidden');
+            }
+        });
+
+        // Restock Product listeners (inside Manage Products Modal)
+        modalRestockSearchEl.addEventListener('input', () => {
+            renderModalRestockList(inventory); // Pass current inventory for filtering
+        });
+        modalApplyRestockBtn.addEventListener('click', applyRestock);
+
+        // Sale Summary Modal event listeners
+        saleSummaryModalCloseBtn.addEventListener('click', closeSaleSummaryModal);
+        saleSummaryCancelBtn.addEventListener('click', closeSaleSummaryModal);
+        saleSummaryCheckoutBtn.addEventListener('click', finalizeSale);
+
+
+        // --- Initial Setup on Window Load ---
+        window.onload = async function() {
+            // Ensure Firebase is loaded from the module script
+            if (typeof window.firebase === 'undefined') {
+                showMessageBox('Error', 'Firebase SDK not loaded. Please try refreshing the page.');
+                return;
+            }
+
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+            const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+            try {
+                firebaseApp = window.firebase.initializeApp(firebaseConfig);
+                auth = window.firebase.getAuth(firebaseApp);
+                db = window.firebase.getFirestore(firebaseApp);
+
+                // Authenticate user
+                window.firebase.onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        userIdDisplayEl.textContent = `User ID: ${userId}`;
+                        isFirebaseReady = true;
+                        setupFirestoreListeners(); // Start listening to Firestore changes after auth is ready
+                    } else {
+                        try {
+                            if (initialAuthToken) {
+                                await window.firebase.signInWithCustomToken(auth, initialAuthToken);
+                            } else {
+                                await window.firebase.signInAnonymously(auth);
+                            }
+                        } catch (anonError) {
+                            console.error("Error signing in anonymously:", anonError);
+                            showMessageBox('Authentication Error', 'Failed to sign in. Please try again.');
+                            userIdDisplayEl.textContent = `User ID: Anonymous (Failed)`;
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error("Failed to initialize Firebase:", error);
+                showMessageBox('Initialization Error', 'Failed to initialize Firebase. Please check your configuration.');
+                userIdDisplayEl.textContent = `User ID: Not Available`;
+            }
+
+            switchMainTab('inventory'); // Start on the inventory tab
+            renderCart(); // Initial render of cart (will show "empty cart" message)
+        };
+    </script>
+</body>
+</html>
