@@ -171,6 +171,38 @@
                 box-shadow: none;
             }
         }
+
+        /* Login Modal background with transparency */
+        #login-modal-container {
+            background-image: url('https://scontent.fmnl17-2.fna.fbcdn.net/v/t39.30808-6/432725210_122115657752230587_8420052317826264936_n.jpg?_nc_cat=107&ccb=1-7&_nc_sid=6ee11a&_nc_eui2=AeFQuix_sgAinwvqEloWRmRrKmfC3maObI8qZ8LeZo5sj8vAQqr_JC9Fpw20JNKdwyGEmKxHmeCS13eK7cNozFC4&_nc_ohc=yXMR9-p-LkAQ7kNvwEGM_iE&_nc_oc=AdkR9Ic0Mv9IkLgZKC9xU5_Me3UPAFxAPa3C_vdUioSCL4JuWwbXpHRxqo946zUguqM&_nc_zt=23&_nc_ht=scontent.fmnl17-2.fna&_nc_gid=mPl3u1cTFM-Uh2z6iZvMEQ&oh=00_AfMqUVBdleOqowIejbYi6JMJI9aiGyE0xLpITnu8Buia-w&oe=686358F5');
+            background-size: cover; /* Cover the entire container */
+            background-position: center; /* Center the image */
+            position: fixed; /* Ensures it covers the whole viewport */
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 50; /* Ensure it's on top */
+        }
+        /* Add an overlay for transparency effect */
+        #login-modal-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6); /* Adjust the alpha value (0.6 for 60% opacity) */
+            z-index: -1; /* Place behind the modal content */
+        }
+        /* Ensure the actual modal content box is visible and on top of the overlay */
+        #login-modal-container > div {
+            z-index: 1; /* Place above the pseudo-element overlay */
+        }
+
     </style>
 
     <!-- Firebase SDK Imports (type="module" is crucial) -->
@@ -213,7 +245,7 @@
             <header id="main-header">
                 <div class="flex items-center space-x-4">
                     <!-- Custom logo based on user request -->
-                    <img src="https://scontent.fmnl17-2.fna.fbcdn.net/v/t39.30808-6/432725210_122115657752230587_8420052317826264936_n.jpg?_nc_cat=107&ccb=1-7&_nc_sid=6ee11a&_nc_eui2=AeFQuix_sgAinwvqEloWRmRrKmfC3maObI8qZ8LeZo5sj8vAQqr_JC9Fpw20JNKdwyGEmKxHmeCS13eK7cNozFC4&_nc_ohc=yXMR9-p-LkAQ7kNvwEGM_iE&_nc_oc=AdkR9Ic0Mv9IkLgZKC9xU5_Me3UPAFxAPa3C_vdUioSCL4JuWwbXpHRxqo946zUguqM&_nc_zt=23&_nc_ht=scontent.fmnl17-2.fna&_nc_gid=BW0dXenNjVSN0gfgFBLyNg&oh=00_AfNVOOLzzAt2XcEsqDJf0PXbRUm3bxfLEljZ6djGhEP5uw&oe=68620775" alt="Garahe ni Hulyo Logo" class="rounded-full w-12 h-12 object-cover">
+                    <img src="https://scontent.fmnl17-2.fna.fbcdn.net/v/t39.30808-6/432725210_122115657752230587_8420052317826264936_n.jpg?_nc_cat=107&ccb=1-7&_nc_sid=6ee11a&_nc_eui2=AeFQuix_sgAinwvqEloWRmRrKmfC3maObI8qZ8LeZo5sj8vAQqr_JC9Fpw20JNKdwyGEmKxHmeCS13eK7cNozFC4&_nc_ohc=yXMR9-p-LkAQ7kNvwEGM_iE&_nc_oc=AdkR9Ic0Mv9IkLgZKC9xU5_Me3UPAFxAPa3C_vdUioSCL4JuWwbXpHRxqo946zUguqM&_nc_zt=23&_nc_ht=scontent.fmnl17-2.fna&_nc_gid=mPl3u1cTFM-Uh2z6iZvMEQ&oh=00_AfMqUVBdleOqowIejbYi6JMJI9aiGyE0xLpITnu8Buia-w&oe=686358F5" alt="Garahe ni Hulyo Logo" class="rounded-full w-12 h-12 object-cover">
                     <h1 class="text-3xl font-extrabold text-white">Garahe ni Hulyo POS System</h1>
                 </div>
                 <!-- User ID Display - Moved to header for visibility -->
