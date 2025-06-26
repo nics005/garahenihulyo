@@ -728,28 +728,28 @@
             sortedItems.forEach(item => {
                 const itemDiv = document.createElement('div');
                 itemDiv.className = `
-                    bg-gray-800 rounded-lg p-4 mb-4 shadow-md border border-gray-700
-                    flex flex-col sm:flex-row justify-between items-center transition-all duration-200
+                    bg-gray-800 rounded-lg p-3 mb-2 shadow-md border border-gray-700
+                    flex items-center justify-between transition-all duration-200
                     hover:scale-[1.01] hover:bg-gray-700
                 `;
                 itemDiv.innerHTML = `
-                    <div class="flex items-center gap-4 text-left mb-3 sm:mb-0">
-                        <img src="${item.imageUrl || 'https://placehold.co/80x80/555555/EEEEEE?text=No+Img'}"
-                             onerror="this.onerror=null;this.src='https://placehold.co/80x80/555555/EEEEEE?text=No+Img';"
-                             alt="${item.name}" class="w-20 h-20 rounded-md object-cover border border-gray-600">
+                    <div class="flex items-center space-x-3">
+                        <img src="${item.imageUrl || 'https://placehold.co/48x48/555555/EEEEEE?text=Img'}"
+                             onerror="this.onerror=null;this.src='https://placehold.co/48x48/555555/EEEEEE?text=Img';"
+                             alt="${item.name}" class="w-12 h-12 rounded-full object-cover border border-gray-600">
                         <div>
-                            <h3 class="text-xl font-semibold text-blue-300">${item.name}</h3>
-                            <p class="text-gray-400">Stock: <span class="font-medium text-gray-200">${item.stock}</span></p>
+                            <h3 class="text-lg font-semibold text-blue-300">${item.name}</h3>
+                            <p class="text-sm text-gray-400">Stock: <span class="font-medium text-gray-200">${item.stock}</span></p>
                         </div>
                     </div>
-                    <div class="flex items-center space-x-4">
-                        <span class="text-2xl font-bold text-white">${formatCurrency(item.price)}</span>
+                    <div class="flex items-center space-x-3">
+                        <span class="text-xl font-bold text-white">${formatCurrency(item.price)}</span>
                         <button data-item-id="${item.id}"
-                                class="add-to-cart-btn px-4 py-2 bg-blue-600 text-white rounded-lg
+                                class="add-to-cart-btn px-3 py-1 bg-blue-600 text-white rounded-lg
                                        hover:bg-blue-700 active:bg-blue-800 transition duration-200
-                                       shadow-md text-sm sm:text-base ${item.stock === 0 ? 'opacity-50 cursor-not-allowed' : ''}"
+                                       shadow-md text-sm ${item.stock === 0 ? 'opacity-50 cursor-not-allowed' : ''}"
                                 ${item.stock === 0 ? 'disabled' : ''}>
-                            Add to Cart
+                            Add
                         </button>
                     </div>
                 `;
@@ -786,29 +786,28 @@
             cart.forEach(item => {
                 const cartItemDiv = document.createElement('div');
                 cartItemDiv.className = `
-                    bg-gray-900 rounded-lg p-4 mb-3 shadow-sm border border-gray-700
-                    flex flex-col sm:flex-row justify-between items-center transition-all duration-200
+                    bg-gray-900 rounded-lg p-1.5 mb-2 shadow-sm border border-gray-700
+                    flex items-center justify-between transition-all duration-200
                     hover:scale-[1.01] hover:bg-gray-900/90
                 `;
                 cartItemDiv.innerHTML = `
-                    <div class="flex items-center gap-4 text-left mb-3 sm:mb-0">
-                        <img src="${item.imageUrl || 'https://placehold.co/60x60/444444/DDDDDD?text=No+Img'}"
-                             onerror="this.onerror=null;this.src='https://placehold.co/60x60/444444/DDDDDD?text=No+Img';"
-                             alt="${item.name}" class="w-16 h-16 rounded-md object-cover border border-gray-600">
-                        <div>
-                            <h3 class="text-xl font-semibold text-blue-300">${item.name}</h3>
-                            <p class="text-gray-400">Price: ${formatCurrency(item.price)}</p>
+                    <div class="flex items-center space-x-1 flex-grow min-w-0">
+                        <img src="${item.imageUrl || 'https://placehold.co/40x40/444444/DDDDDD?text=Img'}"
+                             onerror="this.onerror=null;this.src='https://placehold.co/40x40/444444/DDDDDD?text=Img';"
+                             alt="${item.name}" class="w-10 h-10 rounded-full object-cover border border-gray-600 flex-shrink-0">
+                        <div class="min-w-0">
+                            <h3 class="text-sm font-semibold text-blue-300 truncate">${item.name}</h3>
+                            <p class="text-xs text-gray-400">Price: ${formatCurrency(item.price)}</p>
                         </div>
                     </div>
-                    <div class="flex items-center space-x-3">
+                    <div class="flex items-center space-x-0.5 flex-shrink-0">
                         <input type="number" data-item-id="${item.id}" value="${item.quantity}" min="1"
-                               class="cart-quantity-input w-20 p-2 rounded-md bg-gray-700 border border-gray-600
-                                      text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500 text-center">
-                        <span class="text-xl font-bold text-white w-24 text-right">${formatCurrency(item.price * item.quantity)}</span>
+                               class="cart-quantity-input w-12 p-0.5 rounded-md bg-gray-700 border border-gray-600
+                                      text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500 text-center text-xs">
+                        <span class="text-sm font-bold text-white w-16 text-right flex-shrink-0">${formatCurrency(item.price * item.quantity)}</span>
                         <button data-item-id="${item.id}"
-                                class="remove-from-cart-btn px-3 py-1 bg-red-600 text-white rounded-md
-                                       hover:bg-red-700 active:bg-red-800 transition duration-200
-                                       shadow-md text-sm sm:text-base">X</button>
+                                class="remove-from-cart-btn w-6 h-6 flex items-center justify-center bg-red-600 text-white rounded-md
+                                       hover:bg-red-700 active:bg-red-800 transition duration-200 shadow-md text-xs">X</button>
                     </div>
                 `;
                 cartListEl.appendChild(cartItemDiv);
@@ -858,33 +857,32 @@
             sortedItems.forEach(item => {
                 const itemDiv = document.createElement('div');
                 itemDiv.className = `
-                    bg-gray-800 rounded-lg p-4 mb-4 shadow-md border border-gray-700
-                    flex flex-col sm:flex-row justify-between items-center transition-all duration-200
+                    bg-gray-800 rounded-lg p-3 mb-2 shadow-md border border-gray-700
+                    flex items-center justify-between transition-all duration-200
                     hover:scale-[1.01] hover:bg-gray-700
                 `;
                 itemDiv.innerHTML = `
-                    <div class="flex items-center gap-4 text-left mb-3 sm:mb-0">
-                        <img src="${item.imageUrl || 'https://placehold.co/80x80/555555/EEEEEE?text=No+Img'}"
-                             onerror="this.onerror=null;this.src='https://placehold.co/80x80/555555/EEEEEE?text=No+Img';"
-                             alt="${item.name}" class="w-20 h-20 rounded-md object-cover border border-gray-600">
+                    <div class="flex items-center space-x-3">
+                        <img src="${item.imageUrl || 'https://placehold.co/48x48/555555/EEEEEE?text=Img'}"
+                             onerror="this.onerror=null;this.src='https://placehold.co/48x48/555555/EEEEEE?text=Img';"
+                             alt="${item.name}" class="w-12 h-12 rounded-full object-cover border border-gray-600">
                         <div>
-                            <h3 class="text-xl font-semibold text-blue-300">${item.name}</h3>
-                            <p class="text-gray-400">Price: <span class="font-medium text-gray-200">${formatCurrency(item.price)}</span></p>
-                            <p class="text-gray-400">Stock: <span class="font-medium text-gray-200">${item.stock}</span></p>
-                            <p class="text-gray-400">Restock Level: <span class="font-medium text-gray-200">${item.restockLevel || 'N/A'}</span></p>
+                            <h3 class="text-lg font-semibold text-blue-300">${item.name}</h3>
+                            <p class="text-sm text-gray-400">Stock: <span class="font-medium text-gray-200">${item.stock}</span> | Restock: <span class="font-medium text-gray-200">${item.restockLevel || 'N/A'}</span></p>
                         </div>
                     </div>
-                    <div class="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-3">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xl font-bold text-white">${formatCurrency(item.price)}</span>
                         <button data-item-id="${item.id}"
-                                class="edit-item-btn px-4 py-2 bg-yellow-600 text-white rounded-lg
+                                class="edit-item-btn px-3 py-1 bg-yellow-600 text-white rounded-lg
                                        hover:bg-yellow-700 active:bg-yellow-800 transition duration-200
-                                       shadow-md text-sm sm:text-base">
+                                       shadow-md text-sm">
                             Edit
                         </button>
                         <button data-item-id="${item.id}"
-                                class="delete-item-btn px-4 py-2 bg-red-600 text-white rounded-lg
+                                class="delete-item-btn px-3 py-1 bg-red-600 text-white rounded-lg
                                        hover:bg-red-700 active:bg-red-800 transition duration-200
-                                       shadow-md text-sm sm:text-base">
+                                       shadow-md text-sm">
                             Delete
                         </button>
                     </div>
