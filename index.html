@@ -176,7 +176,7 @@
     <!-- Firebase SDK Imports (type="module" is crucial) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, updateDoc, addDoc, deleteDoc, onSnapshot, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Expose Firebase objects globally for use in the main script
@@ -186,13 +186,16 @@
             signInAnonymously,
             signInWithCustomToken,
             onAuthStateChanged,
+            createUserWithEmailAndPassword, // Added for admin to create users
+            signInWithEmailAndPassword,     // Added for manual login
+            signOut,                        // Added for logout
             getFirestore,
             doc,
             getDoc,
             setDoc,
             updateDoc,
             addDoc,
-            deleteDoc, // Added deleteDoc here
+            deleteDoc,
             onSnapshot,
             collection,
             query,
@@ -220,15 +223,25 @@
 
         <!-- Left Sidebar: Navigation & Management -->
         <div id="left-sidebar">
-            <!-- Removed Navigation H2 heading -->
-
             <!-- Navigation Bar for Main Tabs -->
             <div class="flex flex-col space-y-4 mb-6 bg-gray-800 p-3 rounded-lg shadow-inner border border-gray-700">
                 <button id="tab-inventory" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200 active">Dashboard</button>
-                <button id="tab-manage-products" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200">Manage Products</button>
-                <button id="tab-inventory-master" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200">Inventory Master</button>
-                <button id="tab-report-logs" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200">Report Logs</button>
-                 <button id="tab-sales-report" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200">Sales Report</button>
+                <button id="tab-manage-products" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200 admin-only">Manage Products</button>
+                <button id="tab-inventory-master" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200 admin-only">Inventory Master</button>
+                <button id="tab-report-logs" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200 admin-only">Report Logs</button>
+                <button id="tab-sales-report" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200 admin-only">Sales Report</button>
+                <button id="tab-user-management" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200 admin-only">User Management</button>
+            </div>
+
+            <!-- Login/Logout Section (moved to lower left) -->
+            <div class="mt-auto pt-4 border-t border-gray-700">
+                <p id="current-user-role" class="text-xs text-gray-500 mb-2 text-center">Role: Loading...</p>
+                <button id="login-logout-button"
+                        class="w-full py-2 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white font-bold
+                               rounded-lg shadow-lg transform transition duration-200 hover:scale-105
+                               focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-800">
+                    Login
+                </button>
             </div>
         </div>
 
@@ -255,7 +268,7 @@
             </div>
 
             <!-- Inventory Master Content Area -->
-            <div id="inventory-master-content" class="tab-content hidden flex-1 flex-col">
+            <div id="inventory-master-content" class="tab-content hidden flex-1 flex-col admin-only-content">
                 <h1 class="text-3xl font-bold text-white mb-6 text-center">Inventory Master List</h1>
                 <!-- Search Bar for Master List -->
                 <div class="mb-6">
@@ -276,7 +289,7 @@
 
 
             <!-- Report Logs Content Area -->
-            <div id="report-logs-content" class="tab-content hidden flex-1 flex-col">
+            <div id="report-logs-content" class="tab-content hidden flex-1 flex-col admin-only-content">
                 <h3 class="text-2xl font-bold text-white mb-4 text-center">Sales Report Logs</h3>
                 <!-- Loading Indicator for Sales Logs -->
                 <div id="sales-log-loading" class="flex justify-center items-center h-full hidden">
@@ -290,7 +303,7 @@
             </div>
 
             <!-- Sales Report Content Area -->
-            <div id="sales-report-content" class="tab-content hidden flex-1 flex-col">
+            <div id="sales-report-content" class="tab-content hidden flex-1 flex-col admin-only-content">
                 <h3 class="text-2xl font-bold text-white mb-4 text-center">Total Sales Report</h3>
                 <div class="flex justify-center space-x-4 mb-6">
                     <button id="filter-daily" class="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 active">Daily</button>
@@ -324,6 +337,39 @@
                     Download Report (PDF)
                 </button>
             </div>
+
+            <!-- User Management Content Area -->
+            <div id="user-management-content" class="tab-content hidden flex-1 flex-col admin-only-content">
+                <h1 class="text-3xl font-bold text-white mb-6 text-center">User Management</h1>
+                <div class="mb-6 p-6 bg-gray-800 rounded-lg shadow-md border border-gray-700">
+                    <h3 class="text-xl font-bold text-white mb-4">Add New User</h3>
+                    <div class="mb-4">
+                        <label for="new-user-email" class="block text-gray-300 text-sm font-bold mb-2">Email:</label>
+                        <input type="email" id="new-user-email" placeholder="user@example.com"
+                               class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-600">
+                    </div>
+                    <div class="mb-4">
+                        <label for="new-user-password" class="block text-gray-300 text-sm font-bold mb-2">Password:</label>
+                        <input type="password" id="new-user-password" placeholder="Min 6 characters"
+                               class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-600">
+                    </div>
+                    <div class="mb-6">
+                        <label for="new-user-role" class="block text-gray-300 text-sm font-bold mb-2">Role:</label>
+                        <select id="new-user-role"
+                                class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-600">
+                            <option value="user">User</option>
+                            <option value="admin">Administrator</option>
+                        </select>
+                    </div>
+                    <button id="add-new-user-btn"
+                            class="w-full py-3 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-bold
+                                   rounded-lg shadow-lg transform transition duration-200 hover:scale-105
+                                   focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-gray-800">
+                        Add User
+                    </button>
+                </div>
+            </div>
+
         </div>
 
         <!-- Right Sidebar: Cart & Totals -->
@@ -368,6 +414,29 @@
                 <button id="message-box-cancel" class="px-5 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 transition duration-200">Cancel</button>
                 <button id="message-box-ok" class="px-5 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-200">OK</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="login-modal-container" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50">
+        <div class="bg-gray-800 p-8 rounded-lg shadow-xl border border-gray-700 w-96">
+            <h2 class="text-2xl font-bold text-white mb-6 text-center">Admin Login</h2>
+            <div class="mb-4">
+                <label for="login-email" class="block text-gray-300 text-sm font-bold mb-2">Email:</label>
+                <input type="email" id="login-email" placeholder="admin@example.com"
+                       class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-600">
+            </div>
+            <div class="mb-6">
+                <label for="login-password" class="block text-gray-300 text-sm font-bold mb-2">Password:</label>
+                <input type="password" id="login-password" placeholder="********"
+                       class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-600">
+            </div>
+            <button id="login-submit-btn"
+                    class="w-full py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold
+                           rounded-lg shadow-lg transform transition duration-200 hover:scale-105
+                           focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800">
+                Login
+            </button>
         </div>
     </div>
 
@@ -625,6 +694,7 @@
         // Global Firebase objects (will be populated by the module script)
         let firebaseApp, db, auth;
         let userId = 'anonymous'; // Default until authenticated
+        let userRole = 'guest'; // Default role, 'guest' means not logged in
         let isFirebaseReady = false;
 
         // Data Models - These will now be synchronized with Firestore
@@ -639,7 +709,7 @@
 
         // --- DOM Elements (Declared with 'let' and assigned inside window.onload) ---
         let inventoryListEl, cartListEl, emptyCartMessageEl, subtotalEl, totalEl, inventorySearchEl, checkoutButtonEl;
-        let tabInventoryBtn, tabManageProductsBtn, tabInventoryMasterBtn, tabReportLogsBtn, tabSalesReportBtn;
+        let tabInventoryBtn, tabManageProductsBtn, tabInventoryMasterBtn, tabReportLogsBtn, tabSalesReportBtn, tabUserManagementBtn;
         let inventoryContentEl, inventoryMasterContentEl, masterListEl, masterListSearchEl, masterListLoadingEl;
         let reportLogsContentEl, salesLogListEl, emptyLogsMessageEl, inventoryLoadingEl, salesLogLoadingEl, userIdDisplayEl;
         let messageBoxContainerEl, messageBoxTitleEl, messageBoxTextEl, messageBoxOkBtn, messageBoxCancelBtn;
@@ -652,7 +722,8 @@
         let saleSummaryModalContainer, saleSummaryModalCloseBtn, customerNameEl, customerAddressEl, customerContactEl, saleSummaryItemsListEl, summarySubtotalEl, summaryTotalEl, saleSummaryCancelBtn, saleSummaryCheckoutBtn;
         let receiptModalContainer, receiptModalContentTemplate, activeReceiptPrintBtn, activeReceiptNewSaleBtn, receiptCloseBtn;
         let salesReportContentEl, filterDailyBtn, filterWeeklyBtn, filterMonthlyBtn, reportTotalSalesEl, reportPeriodInfoEl, reportDetailsListEl, emptyReportMessageEl, emptyItemsSummaryMessageEl, downloadReportPdfBtn, reportItemsSummaryEl;
-
+        let loginLogoutButtonEl, loginModalContainerEl, loginEmailEl, loginPasswordEl, loginSubmitBtnEl, currentUserRoleEl; // New elements for login
+        let userManagementContentEl, newUserEmailEl, newUserPasswordEl, newUserRoleEl, addNewUserBtnEl; // New elements for user management
 
         // --- Helper Functions ---
 
@@ -1561,43 +1632,72 @@
 
         /**
          * Switches the active main tab and displays the corresponding content.
-         * @param {string} tabName - The name of the tab to activate ('inventory', 'manage-products', 'inventory-master', 'report-logs', 'sales-report').
+         * @param {string} tabName - The name of the tab to activate ('inventory', 'manage-products', 'inventory-master', 'report-logs', 'sales-report', 'user-management').
          */
         function switchMainTab(tabName) {
             // Hide all main content divs
             inventoryContentEl.classList.add('hidden');
-            inventoryMasterContentEl.classList.add('hidden'); // Hide master list
+            inventoryMasterContentEl.classList.add('hidden');
             reportLogsContentEl.classList.add('hidden');
-            salesReportContentEl.classList.add('hidden'); // Hide sales report content
+            salesReportContentEl.classList.add('hidden');
+            userManagementContentEl.classList.add('hidden'); // Hide user management
 
             // Deactivate all main tab buttons
             tabInventoryBtn.classList.remove('active');
             tabManageProductsBtn.classList.remove('active');
-            tabInventoryMasterBtn.classList.remove('active'); // Deactivate master list button
+            tabInventoryMasterBtn.classList.remove('active');
             tabReportLogsBtn.classList.remove('active');
-            tabSalesReportBtn.classList.remove('active'); // Deactivate sales report button
+            tabSalesReportBtn.classList.remove('active');
+            tabUserManagementBtn.classList.remove('active'); // Deactivate user management button
 
             // Show relevant content and activate relevant button
             if (tabName === 'inventory') {
                 inventoryContentEl.classList.remove('hidden');
                 tabInventoryBtn.classList.add('active');
             } else if (tabName === 'manage-products') {
-                tabManageProductsBtn.classList.add('active');
-                openManageProductModal(); // Open the modal for add/restock
-            } else if (tabName === 'inventory-master') { // New case for Master List
-                inventoryMasterContentEl.classList.remove('hidden');
-                tabInventoryMasterBtn.classList.add('active');
-                renderMasterList(getFilteredMasterList()); // Render and filter master list
+                if (userRole === 'admin') {
+                    tabManageProductsBtn.classList.add('active');
+                    openManageProductModal();
+                } else {
+                    showMessageBox('Access Denied', 'You do not have permission to manage products.');
+                    switchMainTab('inventory'); // Go back to default if no access
+                }
+            } else if (tabName === 'inventory-master') {
+                if (userRole === 'admin') {
+                    inventoryMasterContentEl.classList.remove('hidden');
+                    tabInventoryMasterBtn.classList.add('active');
+                    renderMasterList(getFilteredMasterList());
+                } else {
+                    showMessageBox('Access Denied', 'You do not have permission to view inventory master.');
+                    switchMainTab('inventory');
+                }
             } else if (tabName === 'report-logs') {
-                reportLogsContentEl.classList.remove('hidden');
-                tabReportLogsBtn.classList.add('active');
+                if (userRole === 'admin') {
+                    reportLogsContentEl.classList.remove('hidden');
+                    tabReportLogsBtn.classList.add('active');
+                } else {
+                    showMessageBox('Access Denied', 'You do not have permission to view report logs.');
+                    switchMainTab('inventory');
+                }
             } else if (tabName === 'sales-report') {
-                salesReportContentEl.classList.remove('hidden');
-                tabSalesReportBtn.classList.add('active');
-                // Ensure correct filter is active on tab switch
-                document.querySelectorAll('#sales-report-content button').forEach(btn => btn.classList.remove('active'));
-                document.getElementById(`filter-${currentReportFilter}`).classList.add('active');
-                renderSalesReport(); // Render sales report
+                if (userRole === 'admin') {
+                    salesReportContentEl.classList.remove('hidden');
+                    tabSalesReportBtn.classList.add('active');
+                    document.querySelectorAll('#sales-report-content button').forEach(btn => btn.classList.remove('active'));
+                    document.getElementById(`filter-${currentReportFilter}`).classList.add('active');
+                    renderSalesReport();
+                } else {
+                    showMessageBox('Access Denied', 'You do not have permission to view sales reports.');
+                    switchMainTab('inventory');
+                }
+            } else if (tabName === 'user-management') { // New case for User Management
+                if (userRole === 'admin') {
+                    userManagementContentEl.classList.remove('hidden');
+                    tabUserManagementBtn.classList.add('active');
+                } else {
+                    showMessageBox('Access Denied', 'You do not have permission to manage users.');
+                    switchMainTab('inventory');
+                }
             }
         }
 
@@ -2172,9 +2272,163 @@
             });
         }
 
+        // --- Authentication and Authorization Functions ---
 
-        // --- Event Listeners ---
-        // These will be assigned inside window.onload
+        /**
+         * Updates the UI based on the current user's authentication state and role.
+         */
+        function updateUIForUserRole() {
+            currentUserRoleEl.textContent = `Role: ${userRole.charAt(0).toUpperCase() + userRole.slice(1)}`;
+
+            // Hide/Show navigation tabs based on role
+            document.querySelectorAll('.admin-only').forEach(el => {
+                if (userRole === 'admin') {
+                    el.classList.remove('hidden');
+                } else {
+                    el.classList.add('hidden');
+                }
+            });
+
+            // Hide/Show main content areas based on role
+            document.querySelectorAll('.admin-only-content').forEach(el => {
+                if (userRole === 'admin') {
+                    el.classList.remove('hidden');
+                } else {
+                    el.classList.add('hidden');
+                }
+            });
+
+            // If a restricted tab is currently active, switch to dashboard
+            const activeTabButton = document.querySelector('.tab-button.active');
+            if (activeTabButton && activeTabButton.classList.contains('admin-only') && userRole !== 'admin') {
+                switchMainTab('inventory');
+            }
+
+            // Update Login/Logout button text
+            if (userRole === 'guest') {
+                loginLogoutButtonEl.textContent = 'Login';
+                loginLogoutButtonEl.classList.remove('bg-red-600', 'hover:bg-red-700', 'active:bg-red-800');
+                loginLogoutButtonEl.classList.add('bg-purple-600', 'hover:bg-purple-700', 'active:bg-purple-800');
+            } else {
+                loginLogoutButtonEl.textContent = 'Logout';
+                loginLogoutButtonEl.classList.remove('bg-purple-600', 'hover:bg-purple-700', 'active:bg-purple-800');
+                loginLogoutButtonEl.classList.add('bg-red-600', 'hover:bg-red-700', 'active:bg-red-800');
+            }
+        }
+
+        /**
+         * Opens the login modal.
+         */
+        function openLoginModal() {
+            loginModalContainerEl.classList.remove('hidden');
+            loginEmailEl.value = '';
+            loginPasswordEl.value = '';
+        }
+
+        /**
+         * Closes the login modal.
+         */
+        function closeLoginModal() {
+            loginModalContainerEl.classList.add('hidden');
+        }
+
+        /**
+         * Handles user login with email and password.
+         */
+        async function handleLogin() {
+            const email = loginEmailEl.value;
+            const password = loginPasswordEl.value;
+
+            if (!email || !password) {
+                showMessageBox('Login Error', 'Please enter both email and password.');
+                return;
+            }
+
+            try {
+                const userCredential = await firebase.signInWithEmailAndPassword(auth, email, password);
+                // Auth state listener will handle updating UI and userRole
+                closeLoginModal();
+                showMessageBox('Login Success', `Welcome, ${userCredential.user.email}!`);
+            } catch (error) {
+                console.error("Login error:", error);
+                let errorMessage = 'Login failed. Please check your credentials.';
+                if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+                    errorMessage = 'Invalid email or password.';
+                } else if (error.code === 'auth/invalid-email') {
+                    errorMessage = 'Please enter a valid email address.';
+                } else if (error.code === 'auth/too-many-requests') {
+                    errorMessage = 'Too many failed login attempts. Please try again later.';
+                }
+                showMessageBox('Login Error', errorMessage);
+            }
+        }
+
+        /**
+         * Handles user logout.
+         */
+        async function handleLogout() {
+            const confirmed = await showMessageBox('Confirm Logout', 'Are you sure you want to log out?', true);
+            if (confirmed) {
+                try {
+                    await firebase.signOut(auth);
+                    showMessageBox('Logout Success', 'You have been logged out.');
+                    // onAuthStateChanged will handle role and UI update
+                } catch (error) {
+                    console.error("Logout error:", error);
+                    showMessageBox('Logout Error', 'Failed to log out. Please try again.');
+                }
+            }
+        }
+
+        /**
+         * Adds a new user to Firebase Authentication and sets their role in Firestore.
+         */
+        async function addNewUser() {
+            const email = newUserEmailEl.value.trim();
+            const password = newUserPasswordEl.value.trim();
+            const role = newUserRoleEl.value;
+
+            if (!email || !password || !role) {
+                showMessageBox('Input Error', 'Please fill in all fields (Email, Password, Role).');
+                return;
+            }
+
+            if (password.length < 6) {
+                showMessageBox('Input Error', 'Password must be at least 6 characters long.');
+                return;
+            }
+
+            try {
+                // Create user in Firebase Authentication
+                const userCredential = await firebase.createUserWithEmailAndPassword(auth, email, password);
+                const newUid = userCredential.user.uid;
+
+                // Set user role in Firestore
+                // Use currentAppId for the Firestore path
+                await firebase.setDoc(firebase.doc(db, `artifacts/${currentAppId}/public/data/users`, newUid), {
+                    email: email,
+                    role: role,
+                    createdAt: firebase.serverTimestamp ? firebase.serverTimestamp() : new Date().toISOString() // Fallback for testing outside Canvas
+                });
+
+                showMessageBox('User Added', `User "${email}" added successfully with role "${role}".`);
+                newUserEmailEl.value = '';
+                newUserPasswordEl.value = '';
+                newUserRoleEl.value = 'user'; // Reset to default
+            } catch (error) {
+                console.error("Error adding new user:", error);
+                let errorMessage = 'Failed to add user. Please try again.';
+                if (error.code === 'auth/email-already-in-use') {
+                    errorMessage = 'The email address is already in use by another account.';
+                } else if (error.code === 'auth/invalid-email') {
+                    errorMessage = 'The email address is not valid.';
+                } else if (error.code === 'auth/weak-password') {
+                    errorMessage = 'The password is too weak. Please choose a stronger password.';
+                }
+                showMessageBox('User Add Error', errorMessage);
+            }
+        }
+
 
         // --- Initial Setup on Window Load ---
         // Declare FIREBASE_CONFIG globally
@@ -2205,6 +2459,7 @@
             tabInventoryMasterBtn = document.getElementById('tab-inventory-master');
             tabReportLogsBtn = document.getElementById('tab-report-logs');
             tabSalesReportBtn = document.getElementById('tab-sales-report');
+            tabUserManagementBtn = document.getElementById('tab-user-management'); // User Management tab
 
             inventoryContentEl = document.getElementById('inventory-content');
             inventoryMasterContentEl = document.getElementById('inventory-master-content');
@@ -2285,6 +2540,20 @@
             downloadReportPdfBtn = document.getElementById('download-report-pdf');
             reportItemsSummaryEl = document.getElementById('report-items-summary');
 
+            // New elements for login/logout and user management
+            loginLogoutButtonEl = document.getElementById('login-logout-button');
+            loginModalContainerEl = document.getElementById('login-modal-container');
+            loginEmailEl = document.getElementById('login-email');
+            loginPasswordEl = document.getElementById('login-password');
+            loginSubmitBtnEl = document.getElementById('login-submit-btn');
+            currentUserRoleEl = document.getElementById('current-user-role');
+            userManagementContentEl = document.getElementById('user-management-content');
+            newUserEmailEl = document.getElementById('new-user-email');
+            newUserPasswordEl = document.getElementById('new-user-password');
+            newUserRoleEl = document.getElementById('new-user-role');
+            addNewUserBtnEl = document.getElementById('add-new-user-btn');
+
+
             // Set FIREBASE_CONFIG - IMPORTANT: Use your actual Firebase config here for external deployment
             FIREBASE_CONFIG = {
                 apiKey: "AIzaSyAuuXHxkDxnYISS8GZOQQac9-r23LCB7wM",
@@ -2314,9 +2583,54 @@
                     if (user) {
                         userId = user.uid;
                         userIdDisplayEl.textContent = `User ID: ${userId}`;
+                        // Fetch user's role from Firestore
+                        // Use currentAppId for the Firestore path
+                        const userDocRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/users`, userId);
+                        const userDocSnap = await firebase.getDoc(userDocRef);
+
+                        if (userDocSnap.exists()) {
+                            userRole = userDocSnap.data().role;
+                        } else {
+                            // If user document doesn't exist, it means it's a new anonymous sign-in or direct email sign-up
+                            // For simplicity, we'll assign 'user' role for non-admin accounts by default
+                            // In a real app, you might want a more explicit registration flow.
+                            userRole = 'user';
+                            // Also, check if this is the first admin login case for automatic creation
+                            // This part is for the very first time the app runs and no admin exists.
+                            const adminDocRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/users`, 'admin@example.com_user'); // A fixed ID for checking if default admin exists
+                            const adminDocSnap = await firebase.getDoc(adminDocRef);
+
+                            if (!adminDocSnap.exists()) {
+                                // Only create default admin if it doesn't exist.
+                                await firebase.createUserWithEmailAndPassword(auth, 'admin@example.com', 'password123')
+                                    .then(async (adminUserCredential) => {
+                                        await firebase.setDoc(firebase.doc(db, `artifacts/${currentAppId}/public/data/users`, adminUserCredential.user.uid), {
+                                            email: 'admin@example.com',
+                                            role: 'admin',
+                                            createdAt: new Date().toISOString()
+                                        });
+                                        console.log("Default admin created successfully.");
+                                        // This user will then be handled by the next onAuthStateChanged trigger
+                                        // For now, if current user is not this new admin, they stay as 'user' or 'guest'
+                                    })
+                                    .catch(error => {
+                                        // If default admin already exists or another error, just log
+                                        console.warn("Could not create default admin (might already exist or other error):", error.message);
+                                    });
+                            }
+                        }
                         isFirebaseReady = true;
                         setupFirestoreListeners(); // Start listening to Firestore changes after auth is ready
+                        updateUIForUserRole();
                     } else {
+                        // User is signed out or anonymous
+                        userId = auth.currentUser?.uid || 'anonymous'; // Keep anonymous ID if still signed in anonymously
+                        userRole = 'guest'; // Reset role to guest
+                        userIdDisplayEl.textContent = `User ID: ${userId}`;
+                        isFirebaseReady = true; // Firebase itself is ready, even if user is guest
+                        setupFirestoreListeners(); // Still set up listeners for inventory for guests
+                        updateUIForUserRole();
+
                         try {
                             if (initialAuthToken) { // This part will only work in Canvas
                                 await window.firebase.signInWithCustomToken(auth, initialAuthToken);
@@ -2353,6 +2667,19 @@
             tabInventoryMasterBtn.addEventListener('click', () => switchMainTab('inventory-master'));
             tabReportLogsBtn.addEventListener('click', () => switchMainTab('report-logs'));
             tabSalesReportBtn.addEventListener('click', () => switchMainTab('sales-report')); // New sales report tab listener
+            tabUserManagementBtn.addEventListener('click', () => switchMainTab('user-management')); // User Management tab listener
+
+            // Login/Logout button listener
+            loginLogoutButtonEl.addEventListener('click', () => {
+                if (auth.currentUser && userRole !== 'guest') { // Check if a user is truly logged in (not anonymous)
+                    handleLogout();
+                } else {
+                    openLoginModal();
+                }
+            });
+
+            // Login modal submit listener
+            loginSubmitBtnEl.addEventListener('click', handleLogin);
 
             // Manage Products Modal event listeners
             manageProductModalCloseBtn.addEventListener('click', closeManageProductModal);
@@ -2425,9 +2752,13 @@
             });
             downloadReportPdfBtn.addEventListener('click', generatePdfReport);
 
+            // User Management Listener
+            addNewUserBtnEl.addEventListener('click', addNewUser);
+
             switchMainTab('inventory'); // Start on the dashboard/inventory tab
             renderCart(); // Initial render of cart (will show "empty cart" message)
             filterDailyBtn.classList.add('active'); // Set daily as default active filter for sales report
+            updateUIForUserRole(); // Initial UI update based on default role
         };
     </script>
 </body>
