@@ -206,201 +206,203 @@
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen">
     <!-- Main application container with grid layout -->
-    <div id="main-app-container">
+    <div id="app-content-wrapper" class="hidden"> <!-- Initially hidden until login -->
+        <div id="main-app-container">
 
-        <!-- Top Header Panel -->
-        <header id="main-header">
-            <div class="flex items-center space-x-4">
-                <!-- Custom logo based on user request -->
-                <img src="https://scontent.fmnl17-2.fna.fbcdn.net/v/t39.30808-6/432725210_122115657752230587_8420052317826264936_n.jpg?_nc_cat=107&ccb=1-7&_nc_sid=6ee11a&_nc_eui2=AeFQuix_sgAinwvqEloWRmRrKmfC3maObI8qZ8LeZo5sj8vAQqr_JC9Fpw20JNKdwyGEmKxHmeCS13eK7cNozFC4&_nc_ohc=yXMR9-p-LkAQ7kNvwEGM_iE&_nc_oc=AdkR9Ic0Mv9IkLgZKC9xU5_Me3UPAFxAPa3C_vdUioSCL4JuWwbXpHRxqo946zUguqM&_nc_zt=23&_nc_ht=scontent.fmnl17-2.fna&_nc_gid=BW0dXenNjVSN0gfgFBLyNg&oh=00_AfNVOOLzzAt2XcEsqDJf0PXbRUm3bxfLEljZ6djGhEP5uw&oe=68620775" alt="Garahe ni Hulyo Logo" class="rounded-full w-12 h-12 object-cover">
-                <h1 class="text-3xl font-extrabold text-white">Garahe ni Hulyo POS System</h1>
-            </div>
-            <!-- User ID Display - Moved to header for visibility -->
-            <div class="text-sm text-gray-400 mt-2 md:mt-0">
-                <span id="user-id-display">Loading User...</span>
-            </div>
-        </header>
+            <!-- Top Header Panel -->
+            <header id="main-header">
+                <div class="flex items-center space-x-4">
+                    <!-- Custom logo based on user request -->
+                    <img src="https://scontent.fmnl17-2.fna.fbcdn.net/v/t39.30808-6/432725210_122115657752230587_8420052317826264936_n.jpg?_nc_cat=107&ccb=1-7&_nc_sid=6ee11a&_nc_eui2=AeFQuix_sgAinwvqEloWRmRrKmfC3maObI8qZ8LeZo5sj8vAQqr_JC9Fpw20JNKdwyGEmKxHmeCS13eK7cNozFC4&_nc_ohc=yXMR9-p-LkAQ7kNvwEGM_iE&_nc_oc=AdkR9Ic0Mv9IkLgZKC9xU5_Me3UPAFxAPa3C_vdUioSCL4JuWwbXpHRxqo946zUguqM&_nc_zt=23&_nc_ht=scontent.fmnl17-2.fna&_nc_gid=BW0dXenNjVSN0gfgFBLyNg&oh=00_AfNVOOLzzAt2XcEsqDJf0PXbRUm3bxfLEljZ6djGhEP5uw&oe=68620775" alt="Garahe ni Hulyo Logo" class="rounded-full w-12 h-12 object-cover">
+                    <h1 class="text-3xl font-extrabold text-white">Garahe ni Hulyo POS System</h1>
+                </div>
+                <!-- User ID Display - Moved to header for visibility -->
+                <div class="text-sm text-gray-400 mt-2 md:mt-0">
+                    <span id="user-id-display">Not Logged In</span>
+                </div>
+            </header>
 
-        <!-- Left Sidebar: Navigation & Management -->
-        <div id="left-sidebar">
-            <!-- Navigation Bar for Main Tabs -->
-            <div class="flex flex-col space-y-4 mb-6 bg-gray-800 p-3 rounded-lg shadow-inner border border-gray-700">
-                <button id="tab-inventory" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200 active">Dashboard</button>
-                <button id="tab-manage-products" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200 admin-only">Manage Products</button>
-                <button id="tab-inventory-master" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200 admin-only">Inventory Master</button>
-                <button id="tab-report-logs" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200 admin-only">Report Logs</button>
-                <button id="tab-sales-report" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200 admin-only">Sales Report</button>
-                <button id="tab-user-management" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200 admin-only">User Management</button>
-            </div>
-
-            <!-- Login/Logout Section (moved to lower left) -->
-            <div class="mt-auto pt-4 border-t border-gray-700">
-                <p id="current-user-role" class="text-xs text-gray-500 mb-2 text-center">Role: Loading...</p>
-                <button id="login-logout-button"
-                        class="w-full py-2 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white font-bold
-                               rounded-lg shadow-lg transform transition duration-200 hover:scale-105
-                               focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-800">
-                    Login
-                </button>
-            </div>
-        </div>
-
-        <!-- Main Content Area: Inventory/Product Listing (adapting from original left panel) -->
-        <div id="main-content-area">
-            <!-- Inventory Content Area -->
-            <div id="inventory-content" class="tab-content flex-1 flex flex-col">
-                <h1 class="text-3xl font-bold text-white mb-6 text-center">Product Listing</h1>
-                <!-- Search Bar -->
-                <div class="mb-6">
-                    <input type="text" id="inventory-search" placeholder="Search for parts..."
-                           class="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 placeholder-gray-500
-                                  focus:outline-none focus:ring-2 focus:ring-blue-600 transition duration-200">
-                </div>
-                <!-- Loading Indicator for Inventory -->
-                <div id="inventory-loading" class="flex justify-center items-center h-full hidden">
-                    <div class="spinner"></div>
-                    <p class="ml-3 text-gray-400">Loading Inventory...</p>
-                </div>
-                <!-- Inventory List -->
-                <div id="inventory-list" class="flex-1 overflow-y-auto pr-2">
-                    <!-- Inventory items will be rendered here by JavaScript -->
-                </div>
-            </div>
-
-            <!-- Inventory Master Content Area -->
-            <div id="inventory-master-content" class="tab-content hidden flex-1 flex-col admin-only-content">
-                <h1 class="text-3xl font-bold text-white mb-6 text-center">Inventory Master List</h1>
-                <!-- Search Bar for Master List -->
-                <div class="mb-6">
-                    <input type="text" id="master-list-search" placeholder="Search master list items..."
-                           class="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 placeholder-gray-500
-                                  focus:outline-none focus:ring-2 focus:ring-blue-600 transition duration-200">
-                </div>
-                <!-- Loading Indicator for Master List -->
-                <div id="master-list-loading" class="flex justify-center items-center h-full hidden">
-                    <div class="spinner"></div>
-                    <p class="ml-3 text-gray-400">Loading Master List...</p>
-                </div>
-                <!-- Master List -->
-                <div id="master-list" class="flex-1 overflow-y-auto pr-2">
-                    <!-- Master list items will be rendered here by JavaScript -->
-                </div>
-            </div>
-
-
-            <!-- Report Logs Content Area -->
-            <div id="report-logs-content" class="tab-content hidden flex-1 flex-col admin-only-content">
-                <h3 class="text-2xl font-bold text-white mb-4 text-center">Sales Report Logs</h3>
-                <!-- Loading Indicator for Sales Logs -->
-                <div id="sales-log-loading" class="flex justify-center items-center h-full hidden">
-                    <div class="spinner"></div>
-                    <p class="ml-3 text-gray-400">Loading Sales Logs...</p>
-                </div>
-                <div id="sales-log-list" class="flex-1 overflow-y-auto pr-2">
-                    <!-- Sales logs will be rendered here by JavaScript -->
-                    <p class="text-gray-400 text-center py-8" id="empty-logs-message">No sales records available yet.</p>
-                </div>
-            </div>
-
-            <!-- Sales Report Content Area -->
-            <div id="sales-report-content" class="tab-content hidden flex-1 flex-col admin-only-content">
-                <h3 class="text-2xl font-bold text-white mb-4 text-center">Total Sales Report</h3>
-                <div class="flex justify-center space-x-4 mb-6">
-                    <button id="filter-daily" class="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 active">Daily</button>
-                    <button id="filter-weekly" class="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600">Weekly</button>
-                    <button id="filter-monthly" class="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600">Monthly</button>
+            <!-- Left Sidebar: Navigation & Management -->
+            <div id="left-sidebar">
+                <!-- Navigation Bar for Main Tabs -->
+                <div class="flex flex-col space-y-4 mb-6 bg-gray-800 p-3 rounded-lg shadow-inner border border-gray-700">
+                    <button id="tab-inventory" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200 active">Dashboard</button>
+                    <button id="tab-manage-products" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200 admin-only">Manage Products</button>
+                    <button id="tab-inventory-master" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200 admin-only">Inventory Master</button>
+                    <button id="tab-report-logs" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200 admin-only">Report Logs</button>
+                    <button id="tab-sales-report" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200 admin-only">Sales Report</button>
+                    <button id="tab-user-management" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200 admin-only">User Management</button>
                 </div>
 
-                <div class="bg-gray-800 p-6 rounded-lg shadow-md border border-gray-700 mb-6 text-center">
-                    <h4 class="text-xl font-semibold text-blue-300 mb-2">Total Sales for Period:</h4>
-                    <span id="report-total-sales" class="text-4xl font-extrabold text-white">₱0.00</span>
-                    <p id="report-period-info" class="text-gray-400 text-sm mt-2"></p>
-                </div>
-
-                <div class="bg-gray-800 p-6 rounded-lg shadow-md border border-gray-700 mb-6 flex-1 overflow-y-auto">
-                    <h4 class="text-xl font-semibold text-blue-300 mb-4">Items Sold Summary:</h4>
-                    <div id="report-items-summary">
-                        <!-- Detailed items sold will be rendered here -->
-                    </div>
-                    <p class="text-gray-400 text-center py-8" id="empty-items-summary-message">No items sold in this period.</p>
-                </div>
-
-                <!-- Added div for individual sales logs in the sales report -->
-                <div id="report-details-list" class="bg-gray-800 p-6 rounded-lg shadow-md border border-gray-700 mb-6 flex-1 overflow-y-auto">
-                    <!-- Individual sales logs will be rendered here -->
-                </div>
-
-                <button id="download-report-pdf"
-                        class="w-full py-3 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-bold
-                               rounded-lg shadow-lg transform transition duration-200 hover:scale-105 mt-6
-                               focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-gray-800">
-                    Download Report (PDF)
-                </button>
-            </div>
-
-            <!-- User Management Content Area -->
-            <div id="user-management-content" class="tab-content hidden flex-1 flex-col admin-only-content">
-                <h1 class="text-3xl font-bold text-white mb-6 text-center">User Management</h1>
-                <div class="mb-6 p-6 bg-gray-800 rounded-lg shadow-md border border-gray-700">
-                    <h3 class="text-xl font-bold text-white mb-4">Add New User</h3>
-                    <div class="mb-4">
-                        <label for="new-user-email" class="block text-gray-300 text-sm font-bold mb-2">Email:</label>
-                        <input type="email" id="new-user-email" placeholder="user@example.com"
-                               class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-600">
-                    </div>
-                    <div class="mb-4">
-                        <label for="new-user-password" class="block text-gray-300 text-sm font-bold mb-2">Password:</label>
-                        <input type="password" id="new-user-password" placeholder="Min 6 characters"
-                               class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-600">
-                    </div>
-                    <div class="mb-6">
-                        <label for="new-user-role" class="block text-gray-300 text-sm font-bold mb-2">Role:</label>
-                        <select id="new-user-role"
-                                class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-600">
-                            <option value="user">User</option>
-                            <option value="admin">Administrator</option>
-                        </select>
-                    </div>
-                    <button id="add-new-user-btn"
-                            class="w-full py-3 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-bold
+                <!-- Login/Logout Section (moved to lower left) -->
+                <div class="mt-auto pt-4 border-t border-gray-700">
+                    <p id="current-user-role" class="text-xs text-gray-500 mb-2 text-center">Role: Not Logged In</p>
+                    <button id="login-logout-button"
+                            class="w-full py-2 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white font-bold
                                    rounded-lg shadow-lg transform transition duration-200 hover:scale-105
-                                   focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-gray-800">
-                        Add User
+                                   focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-800">
+                        Login
                     </button>
                 </div>
             </div>
 
-        </div>
+            <!-- Main Content Area: Inventory/Product Listing (adapting from original left panel) -->
+            <div id="main-content-area">
+                <!-- Inventory Content Area -->
+                <div id="inventory-content" class="tab-content flex-1 flex flex-col">
+                    <h1 class="text-3xl font-bold text-white mb-6 text-center">Product Listing</h1>
+                    <!-- Search Bar -->
+                    <div class="mb-6">
+                        <input type="text" id="inventory-search" placeholder="Search for parts..."
+                               class="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 placeholder-gray-500
+                                      focus:outline-none focus:ring-2 focus:ring-blue-600 transition duration-200">
+                    </div>
+                    <!-- Loading Indicator for Inventory -->
+                    <div id="inventory-loading" class="flex justify-center items-center h-full hidden">
+                        <div class="spinner"></div>
+                        <p class="ml-3 text-gray-400">Loading Inventory...</p>
+                    </div>
+                    <!-- Inventory List -->
+                    <div id="inventory-list" class="flex-1 overflow-y-auto pr-2">
+                        <!-- Inventory items will be rendered here by JavaScript -->
+                    </div>
+                </div>
 
-        <!-- Right Sidebar: Cart & Totals -->
-        <div id="right-sidebar">
-            <h1 class="text-3xl font-bold text-white mb-6 text-center">Cart List</h1>
+                <!-- Inventory Master Content Area -->
+                <div id="inventory-master-content" class="tab-content hidden flex-1 flex-col admin-only-content">
+                    <h1 class="text-3xl font-bold text-white mb-6 text-center">Inventory Master List</h1>
+                    <!-- Search Bar for Master List -->
+                    <div class="mb-6">
+                        <input type="text" id="master-list-search" placeholder="Search master list items..."
+                               class="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 placeholder-gray-500
+                                      focus:outline-none focus:ring-2 focus:ring-blue-600 transition duration-200">
+                    </div>
+                    <!-- Loading Indicator for Master List -->
+                    <div id="master-list-loading" class="flex justify-center items-center h-full hidden">
+                        <div class="spinner"></div>
+                        <p class="ml-3 text-gray-400">Loading Master List...</p>
+                    </div>
+                    <!-- Master List -->
+                    <div id="master-list" class="flex-1 overflow-y-auto pr-2">
+                        <!-- Master list items will be rendered here by JavaScript -->
+                    </div>
+                </div>
 
-            <!-- Cart Items List -->
-            <div id="cart-list" class="flex-1 overflow-y-auto pr-2 mb-6">
-                <!-- Cart items will be rendered here by JavaScript -->
-                <p id="empty-cart-message" class="text-gray-400 text-center py-8">Your cart is empty. Add some items!</p>
+
+                <!-- Report Logs Content Area -->
+                <div id="report-logs-content" class="tab-content hidden flex-1 flex-col admin-only-content">
+                    <h3 class="text-2xl font-bold text-white mb-4 text-center">Sales Report Logs</h3>
+                    <!-- Loading Indicator for Sales Logs -->
+                    <div id="sales-log-loading" class="flex justify-center items-center h-full hidden">
+                        <div class="spinner"></div>
+                        <p class="ml-3 text-gray-400">Loading Sales Logs...</p>
+                    </div>
+                    <div id="sales-log-list" class="flex-1 overflow-y-auto pr-2">
+                        <!-- Sales logs will be rendered here by JavaScript -->
+                        <p class="text-gray-400 text-center py-8" id="empty-logs-message">No sales records available yet.</p>
+                    </div>
+                </div>
+
+                <!-- Sales Report Content Area -->
+                <div id="sales-report-content" class="tab-content hidden flex-1 flex-col admin-only-content">
+                    <h3 class="text-2xl font-bold text-white mb-4 text-center">Total Sales Report</h3>
+                    <div class="flex justify-center space-x-4 mb-6">
+                        <button id="filter-daily" class="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 active">Daily</button>
+                        <button id="filter-weekly" class="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600">Weekly</button>
+                        <button id="filter-monthly" class="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600">Monthly</button>
+                    </div>
+
+                    <div class="bg-gray-800 p-6 rounded-lg shadow-md border border-gray-700 mb-6 text-center">
+                        <h4 class="text-xl font-semibold text-blue-300 mb-2">Total Sales for Period:</h4>
+                        <span id="report-total-sales" class="text-4xl font-extrabold text-white">₱0.00</span>
+                        <p id="report-period-info" class="text-gray-400 text-sm mt-2"></p>
+                    </div>
+
+                    <div class="bg-gray-800 p-6 rounded-lg shadow-md border border-gray-700 mb-6 flex-1 overflow-y-auto">
+                        <h4 class="text-xl font-semibold text-blue-300 mb-4">Items Sold Summary:</h4>
+                        <div id="report-items-summary">
+                            <!-- Detailed items sold will be rendered here -->
+                        </div>
+                        <p class="text-gray-400 text-center py-8" id="empty-items-summary-message">No items sold in this period.</p>
+                    </div>
+
+                    <!-- Added div for individual sales logs in the sales report -->
+                    <div id="report-details-list" class="bg-gray-800 p-6 rounded-lg shadow-md border border-gray-700 mb-6 flex-1 overflow-y-auto">
+                        <!-- Individual sales logs will be rendered here -->
+                    </div>
+
+                    <button id="download-report-pdf"
+                            class="w-full py-3 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-bold
+                                   rounded-lg shadow-lg transform transition duration-200 hover:scale-105 mt-6
+                                   focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-gray-800">
+                        Download Report (PDF)
+                    </button>
+                </div>
+
+                <!-- User Management Content Area -->
+                <div id="user-management-content" class="tab-content hidden flex-1 flex-col admin-only-content">
+                    <h1 class="text-3xl font-bold text-white mb-6 text-center">User Management</h1>
+                    <div class="mb-6 p-6 bg-gray-800 rounded-lg shadow-md border border-gray-700">
+                        <h3 class="text-xl font-bold text-white mb-4">Add New User</h3>
+                        <div class="mb-4">
+                            <label for="new-user-email" class="block text-gray-300 text-sm font-bold mb-2">Email:</label>
+                            <input type="email" id="new-user-email" placeholder="user@example.com"
+                                   class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-600">
+                        </div>
+                        <div class="mb-4">
+                            <label for="new-user-password" class="block text-gray-300 text-sm font-bold mb-2">Password:</label>
+                            <input type="password" id="new-user-password" placeholder="Min 6 characters"
+                                   class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-600">
+                        </div>
+                        <div class="mb-6">
+                            <label for="new-user-role" class="block text-gray-300 text-sm font-bold mb-2">Role:</label>
+                            <select id="new-user-role"
+                                    class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-600">
+                                <option value="user">User</option>
+                                <option value="admin">Administrator</option>
+                            </select>
+                        </div>
+                        <button id="add-new-user-btn"
+                                class="w-full py-3 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-bold
+                                       rounded-lg shadow-lg transform transition duration-200 hover:scale-105
+                                       focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-gray-800">
+                            Add User
+                        </button>
+                    </div>
+                </div>
+
             </div>
 
-            <!-- Totals Section -->
-            <div class="border-t border-gray-700 pt-6">
-                <div class="flex justify-between items-center mb-2">
-                    <span class="text-lg text-gray-300">Subtotal:</span>
-                    <span id="subtotal" class="text-xl font-semibold text-white">₱0.00</span>
-                </div>
-                <!-- Tax (10%) div removed -->
-                <div class="flex justify-between items-center mb-4">
-                    <span class="text-2xl font-bold text-blue-400">Total:</span>
-                    <span id="total" class="text-3xl font-extrabold text-blue-300">₱0.00</span>
+            <!-- Right Sidebar: Cart & Totals -->
+            <div id="right-sidebar">
+                <h1 class="text-3xl font-bold text-white mb-6 text-center">Cart List</h1>
+
+                <!-- Cart Items List -->
+                <div id="cart-list" class="flex-1 overflow-y-auto pr-2 mb-6">
+                    <!-- Cart items will be rendered here by JavaScript -->
+                    <p id="empty-cart-message" class="text-gray-400 text-center py-8">Your cart is empty. Add some items!</p>
                 </div>
 
-                <!-- Checkout Button -->
-                <button id="checkout-button"
-                        class="w-full py-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold
-                               rounded-lg shadow-lg transform transition duration-200 hover:scale-105
-                               focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800">
-                    Process Sale
-                </button>
+                <!-- Totals Section -->
+                <div class="border-t border-gray-700 pt-6">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-lg text-gray-300">Subtotal:</span>
+                        <span id="subtotal" class="text-xl font-semibold text-white">₱0.00</span>
+                    </div>
+                    <!-- Tax (10%) div removed -->
+                    <div class="flex justify-between items-center mb-4">
+                        <span class="text-2xl font-bold text-blue-400">Total:</span>
+                        <span id="total" class="text-3xl font-extrabold text-blue-300">₱0.00</span>
+                    </div>
+
+                    <!-- Checkout Button -->
+                    <button id="checkout-button"
+                            class="w-full py-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold
+                                   rounded-lg shadow-lg transform transition duration-200 hover:scale-105
+                                   focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800">
+                        Process Sale
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -418,9 +420,9 @@
     </div>
 
     <!-- Login Modal -->
-    <div id="login-modal-container" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50">
+    <div id="login-modal-container" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50">
         <div class="bg-gray-800 p-8 rounded-lg shadow-xl border border-gray-700 w-96">
-            <h2 class="text-2xl font-bold text-white mb-6 text-center">Admin Login</h2>
+            <h2 class="text-2xl font-bold text-white mb-6 text-center">Login to Garahe ni Hulyo</h2>
             <div class="mb-4">
                 <label for="login-email" class="block text-gray-300 text-sm font-bold mb-2">Email:</label>
                 <input type="email" id="login-email" placeholder="admin@example.com"
@@ -693,7 +695,7 @@
     <script>
         // Global Firebase objects (will be populated by the module script)
         let firebaseApp, db, auth;
-        let userId = 'anonymous'; // Default until authenticated
+        let userId = 'Not Logged In'; // Default until authenticated
         let userRole = 'guest'; // Default role, 'guest' means not logged in
         let isFirebaseReady = false;
 
@@ -708,6 +710,7 @@
         let currentReportFilter = 'daily'; // Default filter for sales report
 
         // --- DOM Elements (Declared with 'let' and assigned inside window.onload) ---
+        let appContentWrapperEl; // New wrapper element
         let inventoryListEl, cartListEl, emptyCartMessageEl, subtotalEl, totalEl, inventorySearchEl, checkoutButtonEl;
         let tabInventoryBtn, tabManageProductsBtn, tabInventoryMasterBtn, tabReportLogsBtn, tabSalesReportBtn, tabUserManagementBtn;
         let inventoryContentEl, inventoryMasterContentEl, masterListEl, masterListSearchEl, masterListLoadingEl;
@@ -1173,8 +1176,8 @@
          * @param {string} itemId - The ID of the item to add.
          */
         async function addItemToCart(itemId) {
-            if (!isFirebaseReady) {
-                showMessageBox('Loading', 'Please wait while the system is initializing...');
+            if (!isFirebaseReady || !auth.currentUser) {
+                showMessageBox('Login Required', 'Please log in to add items to the cart.');
                 return;
             }
             try {
@@ -1230,8 +1233,8 @@
          * @param {number} newQuantity - The desired new quantity for the item.
          */
         async function setCartQuantity(itemId, newQuantity) {
-            if (!isFirebaseReady) {
-                showMessageBox('Loading', 'Please wait while the system is initializing...');
+            if (!isFirebaseReady || !auth.currentUser) {
+                showMessageBox('Login Required', 'Please log in to modify cart items.');
                 return;
             }
 
@@ -1307,8 +1310,8 @@
          * @param {string} itemId - The ID of the item to remove.
          */
         async function removeItemFromCart(itemId) {
-            if (!isFirebaseReady) {
-                showMessageBox('Loading', 'Please wait while the system is initializing...');
+            if (!isFirebaseReady || !auth.currentUser) {
+                showMessageBox('Login Required', 'Please log in to remove items from the cart.');
                 return;
             }
             try {
@@ -1337,6 +1340,10 @@
          * Initiates the checkout process by opening the sale summary modal.
          */
         async function initiateCheckout() {
+            if (!auth.currentUser) {
+                showMessageBox('Login Required', 'Please log in to process a sale.');
+                return;
+            }
             if (cart.length === 0) {
                 showMessageBox('Cart Empty', 'Please add items to the cart before checking out.');
                 return;
@@ -1379,8 +1386,8 @@
          * Handles adding a new product to the inventory in Firestore.
          */
         async function addNewProduct() {
-            if (!isFirebaseReady) {
-                showMessageBox('Loading', 'Please wait while the system is initializing...');
+            if (!isFirebaseReady || userRole !== 'admin') {
+                showMessageBox('Access Denied', 'You do not have permission to add products.');
                 return;
             }
             const name = modalNewProductNameEl.value.trim();
@@ -1445,8 +1452,8 @@
          * Handles applying restock quantities to multiple products in Firestore.
          */
         async function applyRestock() {
-            if (!isFirebaseReady) {
-                showMessageBox('Loading', 'Please wait while the system is initializing...');
+            if (!isFirebaseReady || userRole !== 'admin') {
+                showMessageBox('Access Denied', 'You do not have permission to restock products.');
                 return;
             }
             const restockInputs = document.querySelectorAll('#modal-restock-list .restock-quantity-input');
@@ -1488,6 +1495,10 @@
          * @param {string} itemId - The ID of the product to edit.
          */
         function openEditProductDetailsModal(itemId) {
+            if (userRole !== 'admin') {
+                showMessageBox('Access Denied', 'You do not have permission to edit products.');
+                return;
+            }
             const itemToEdit = inventory.find(item => item.id === itemId);
 
             if (!itemToEdit) {
@@ -1538,8 +1549,8 @@
          * Saves the edited product details to Firestore.
          */
         async function saveEditedProduct() {
-            if (!isFirebaseReady) {
-                showMessageBox('Loading', 'Please wait while the system is initializing...');
+            if (!isFirebaseReady || userRole !== 'admin') {
+                showMessageBox('Access Denied', 'You do not have permission to save product changes.');
                 return;
             }
 
@@ -1602,8 +1613,8 @@
          * @param {string} itemId - The ID of the product to delete.
          */
         async function deleteProduct(itemId) {
-            if (!isFirebaseReady) {
-                showMessageBox('Loading', 'Please wait while the system is initializing...');
+            if (!isFirebaseReady || userRole !== 'admin') {
+                showMessageBox('Access Denied', 'You do not have permission to delete products.');
                 return;
             }
 
@@ -1941,8 +1952,8 @@
          * Finalizes the sale and adds it to Firestore sales logs.
          */
         async function finalizeSale() {
-            if (!isFirebaseReady) {
-                showMessageBox('Loading', 'Please wait while the system is initializing...');
+            if (!isFirebaseReady || !auth.currentUser) {
+                showMessageBox('Login Required', 'Please log in to finalize a sale.');
                 return;
             }
             const customerName = customerNameEl.value.trim();
@@ -2178,7 +2189,7 @@
                 console.error("Error generating PDF:", error);
                 showMessageBox('Error', 'Failed to generate PDF. Please try again or check console for details.');
             } finally {
-                // Show buttons again after PDF generation (even if it failed)
+                // Ensure buttons are always shown again
                 buttonsToHide.forEach(btn => btn.classList.remove('hidden'));
             }
         }
@@ -2240,7 +2251,10 @@
                 }
             }, (error) => {
                 console.error("Error listening to inventory:", error);
-                showMessageBox('Data Error', 'Failed to load inventory data. Please check your connection and try again.');
+                // Only show data error if user is logged in, as guests won't have access anyway
+                if (auth.currentUser) {
+                    showMessageBox('Data Error', 'Failed to load inventory data. Please check your connection and security rules.');
+                }
                 inventoryLoadingEl.classList.add('hidden');
                 masterListLoadingEl.classList.add('hidden');
             });
@@ -2267,7 +2281,10 @@
                 }
             }, (error) => {
                 console.error("Error listening to sales logs:", error);
-                showMessageBox('Data Error', 'Failed to load sales log data. Please check your connection and try again.');
+                // Only show data error if user is logged in and is admin
+                if (auth.currentUser && userRole === 'admin') {
+                    showMessageBox('Data Error', 'Failed to load sales log data. Please check your connection and security rules.');
+                }
                 salesLogLoadingEl.classList.add('hidden');
             });
         }
@@ -2321,6 +2338,7 @@
          */
         function openLoginModal() {
             loginModalContainerEl.classList.remove('hidden');
+            appContentWrapperEl.classList.add('hidden'); // Hide main app when showing login modal
             loginEmailEl.value = '';
             loginPasswordEl.value = '';
         }
@@ -2330,6 +2348,7 @@
          */
         function closeLoginModal() {
             loginModalContainerEl.classList.add('hidden');
+            appContentWrapperEl.classList.remove('hidden'); // Show main app after login modal is closed
         }
 
         /**
@@ -2347,17 +2366,19 @@
             try {
                 const userCredential = await firebase.signInWithEmailAndPassword(auth, email, password);
                 // Auth state listener will handle updating UI and userRole
-                closeLoginModal();
+                // No need to call closeLoginModal() here, onAuthStateChanged handles it.
                 showMessageBox('Login Success', `Welcome, ${userCredential.user.email}!`);
             } catch (error) {
                 console.error("Login error:", error);
                 let errorMessage = 'Login failed. Please check your credentials.';
-                if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+                if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
                     errorMessage = 'Invalid email or password.';
                 } else if (error.code === 'auth/invalid-email') {
                     errorMessage = 'Please enter a valid email address.';
                 } else if (error.code === 'auth/too-many-requests') {
                     errorMessage = 'Too many failed login attempts. Please try again later.';
+                } else if (error.code === 'auth/operation-not-allowed') {
+                    errorMessage = 'Email/Password sign-in is not enabled. Please enable it in Firebase Authentication.';
                 }
                 showMessageBox('Login Error', errorMessage);
             }
@@ -2372,7 +2393,7 @@
                 try {
                     await firebase.signOut(auth);
                     showMessageBox('Logout Success', 'You have been logged out.');
-                    // onAuthStateChanged will handle role and UI update
+                    // onAuthStateChanged will handle role and UI update and showing login modal
                 } catch (error) {
                     console.error("Logout error:", error);
                     showMessageBox('Logout Error', 'Failed to log out. Please try again.');
@@ -2384,6 +2405,11 @@
          * Adds a new user to Firebase Authentication and sets their role in Firestore.
          */
         async function addNewUser() {
+            if (!isFirebaseReady || userRole !== 'admin') {
+                showMessageBox('Access Denied', 'You do not have permission to add new users.');
+                return;
+            }
+
             const email = newUserEmailEl.value.trim();
             const password = newUserPasswordEl.value.trim();
             const role = newUserRoleEl.value;
@@ -2446,6 +2472,7 @@
             }
 
             // Assign DOM elements here to ensure they are available
+            appContentWrapperEl = document.getElementById('app-content-wrapper'); // Get the new wrapper
             inventoryListEl = document.getElementById('inventory-list');
             cartListEl = document.getElementById('cart-list');
             emptyCartMessageEl = document.getElementById('empty-cart-message');
@@ -2570,15 +2597,21 @@
             currentAppId = typeof __app_id !== 'undefined' ? __app_id : FIREBASE_CONFIG.projectId;
 
             const firebaseConfigForInit = (typeof __firebase_config !== 'undefined' && Object.keys(JSON.parse(__firebase_config)).length > 0) ? JSON.parse(__firebase_config) : FIREBASE_CONFIG;
-            const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+            // The __initial_auth_token is no longer used for auto-login in this mandatory login flow.
+            // const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
 
             try {
                 firebaseApp = window.firebase.initializeApp(firebaseConfigForInit);
                 auth = window.firebase.getAuth(firebaseApp);
                 db = window.firebase.getFirestore(firebaseApp);
+                isFirebaseReady = true; // Firebase is initialized
 
-                // Authenticate user
+                // Always show the login modal first
+                openLoginModal();
+                appContentWrapperEl.classList.add('hidden'); // Ensure main content is hidden
+
+                // Authenticate user listener
                 window.firebase.onAuthStateChanged(auth, async (user) => {
                     if (user) {
                         userId = user.uid;
@@ -2586,67 +2619,60 @@
                         // Fetch user's role from Firestore
                         // Use currentAppId for the Firestore path
                         const userDocRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/users`, userId);
-                        const userDocSnap = await firebase.getDoc(userDocRef);
-
-                        if (userDocSnap.exists()) {
-                            userRole = userDocSnap.data().role;
-                        } else {
-                            // If user document doesn't exist, it means it's a new anonymous sign-in or direct email sign-up
-                            // For simplicity, we'll assign 'user' role for non-admin accounts by default
-                            // In a real app, you might want a more explicit registration flow.
-                            userRole = 'user';
-                            // Also, check if this is the first admin login case for automatic creation
-                            // This part is for the very first time the app runs and no admin exists.
-                            const adminDocRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/users`, 'admin@example.com_user'); // A fixed ID for checking if default admin exists
-                            const adminDocSnap = await firebase.getDoc(adminDocRef);
-
-                            if (!adminDocSnap.exists()) {
-                                // Only create default admin if it doesn't exist.
-                                await firebase.createUserWithEmailAndPassword(auth, 'admin@example.com', 'password123')
-                                    .then(async (adminUserCredential) => {
-                                        await firebase.setDoc(firebase.doc(db, `artifacts/${currentAppId}/public/data/users`, adminUserCredential.user.uid), {
-                                            email: 'admin@example.com',
-                                            role: 'admin',
-                                            createdAt: new Date().toISOString()
-                                        });
-                                        console.log("Default admin created successfully.");
-                                        // This user will then be handled by the next onAuthStateChanged trigger
-                                        // For now, if current user is not this new admin, they stay as 'user' or 'guest'
-                                    })
-                                    .catch(error => {
-                                        // If default admin already exists or another error, just log
-                                        console.warn("Could not create default admin (might already exist or other error):", error.message);
-                                    });
+                        try {
+                            const userDocSnap = await firebase.getDoc(userDocRef);
+                            if (userDocSnap.exists()) {
+                                userRole = userDocSnap.data().role;
+                            } else {
+                                // Default to 'user' if role document is not found (e.g., new user created externally)
+                                userRole = 'user';
+                                // Optionally, create the role document for newly logged-in users if it doesn't exist
+                                await firebase.setDoc(userDocRef, {
+                                    email: user.email,
+                                    role: userRole,
+                                    createdAt: new Date().toISOString()
+                                }, { merge: true }); // Merge to avoid overwriting if partial data exists
                             }
+                        } catch (firestoreError) {
+                            console.error("Error fetching user role from Firestore:", firestoreError);
+                            showMessageBox('Profile Error', 'Could not load user profile. Some features may be restricted.');
+                            userRole = 'user'; // Fallback to basic user role
                         }
-                        isFirebaseReady = true;
+
+                        // User is logged in, show the main app and hide the login modal
+                        closeLoginModal();
                         setupFirestoreListeners(); // Start listening to Firestore changes after auth is ready
                         updateUIForUserRole();
+                        // Switch to inventory after login
+                        switchMainTab('inventory');
+
                     } else {
-                        // User is signed out or anonymous
-                        userId = auth.currentUser?.uid || 'anonymous'; // Keep anonymous ID if still signed in anonymously
+                        // User is signed out or no user is logged in
+                        userId = 'Not Logged In';
                         userRole = 'guest'; // Reset role to guest
                         userIdDisplayEl.textContent = `User ID: ${userId}`;
-                        isFirebaseReady = true; // Firebase itself is ready, even if user is guest
-                        setupFirestoreListeners(); // Still set up listeners for inventory for guests
+
+                        // Hide main app content and show login modal
+                        appContentWrapperEl.classList.add('hidden');
+                        openLoginModal();
                         updateUIForUserRole();
 
-                        try {
-                            if (initialAuthToken) { // This part will only work in Canvas
-                                await window.firebase.signInWithCustomToken(auth, initialAuthToken);
-                            } else {
-                                await window.firebase.signInAnonymously(auth); // This is the fallback for Netlify
-                            }
-                        } catch (anonError) {
-                            console.error("Error signing in anonymously:", anonError);
-                            showMessageBox('Authentication Error', 'Failed to sign in. Please try again.');
-                            userIdDisplayEl.textContent = `User ID: Anonymous (Failed)`;
-                        }
+                        // Unsubscribe from Firestore listeners if user logs out
+                        if (inventoryUnsubscribe) inventoryUnsubscribe();
+                        if (salesLogsUnsubscribe) salesLogsUnsubscribe();
+                        // Clear data when logged out
+                        inventory = [];
+                        cart = [];
+                        salesLogs = [];
+                        renderInventory();
+                        renderCart();
+                        renderReportLogs();
+                        renderSalesReport();
                     }
                 });
             } catch (error) {
                 console.error("Failed to initialize Firebase:", error);
-                showMessageBox('Initialization Error', 'Failed to initialize Firebase. Please check your configuration.');
+                showMessageBox('Initialization Error', 'Failed to initialize Firebase. Please check your configuration and internet connection.');
                 userIdDisplayEl.textContent = `User ID: Not Available`;
             }
 
@@ -2671,7 +2697,7 @@
 
             // Login/Logout button listener
             loginLogoutButtonEl.addEventListener('click', () => {
-                if (auth.currentUser && userRole !== 'guest') { // Check if a user is truly logged in (not anonymous)
+                if (auth.currentUser) { // If there's any authenticated user
                     handleLogout();
                 } else {
                     openLoginModal();
@@ -2755,10 +2781,10 @@
             // User Management Listener
             addNewUserBtnEl.addEventListener('click', addNewUser);
 
-            switchMainTab('inventory'); // Start on the dashboard/inventory tab
-            renderCart(); // Initial render of cart (will show "empty cart" message)
+            // Initial renders (these will be empty/default until login occurs and data loads)
+            renderCart();
             filterDailyBtn.classList.add('active'); // Set daily as default active filter for sales report
-            updateUIForUserRole(); // Initial UI update based on default role
+            updateUIForUserRole(); // Initial UI update based on default role (guest)
         };
     </script>
 </body>
