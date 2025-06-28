@@ -950,7 +950,11 @@
                 calculateTotals(); // Ensure totals are zeroed out
                 return;
             } else {
-                emptyCartMessageEl.classList.add('hidden');
+                emptyCartMessageEl.classList.remove('hidden'); // Keep this line as 'empty-cart-message' is the default placeholder for when the cart is empty
+                // Hide empty-cart-message if there are items, but only if it's currently visible
+                if (!emptyCartMessageEl.classList.contains('hidden')) {
+                    emptyCartMessageEl.classList.add('hidden');
+                }
                 checkoutButtonEl.disabled = false;
                 checkoutButtonEl.classList.remove('opacity-50', 'cursor-not-allowed');
                 // Show discount row only if a coupon is applied
@@ -960,6 +964,7 @@
                     appliedDiscountDisplayRowEl.classList.add('hidden');
                 }
             }
+
 
             cart.forEach(item => {
                 const cartItemDiv = document.createElement('div');
@@ -1244,6 +1249,8 @@
          * @param {Object} saleData - The sale data to render (can be currentSale or a historical salesLog).
          */
         function renderReceiptContent(saleData) {
+            console.log("Rendering receipt content with saleData:", saleData);
+
             // Populate the receipt modal content template (receiptModalContentTemplate is the div itself)
             const saleDateTime = saleData.timestamp.toDate ? saleData.timestamp.toDate() : new Date(saleData.timestamp);
             receiptModalContentTemplate.querySelector('#receipt-invoice-id').textContent = saleData.salesInvoiceId || 'N/A';
@@ -1259,7 +1266,7 @@
             saleData.items.forEach(item => {
                 const itemDiv = document.createElement('div');
                 itemDiv.className = `
-                    flex justify-between items-center py-1 border-b border-gray-700 last:border-b-0
+                    flex justify-between items-center py-1 border-b border-gray-800 last:border-b-0
                 `;
                 itemDiv.innerHTML = `
                     <span class="text-gray-200">${item.name} x ${item.quantity}</span>
@@ -1272,11 +1279,13 @@
 
             // Render discount row on receipt - ALWAYS show the row, even if discount is zero
             receiptDiscountRowEl.classList.remove('hidden'); // Ensure the row is visible
-            if (saleData.couponApplied && saleData.discountAmount > 0) {
-                receiptDiscountEl.textContent = formatCurrency(saleData.discountAmount);
-            } else {
-                receiptDiscountEl.textContent = formatCurrency(0);
-            }
+
+            // Check for saleData.discountAmount directly, which should be correct
+            const discountValue = saleData.discountAmount !== undefined ? saleData.discountAmount : 0;
+            receiptDiscountEl.textContent = formatCurrency(discountValue);
+
+            console.log("Receipt discount amount set to:", formatCurrency(discountValue));
+
 
             receiptModalContentTemplate.querySelector('#receipt-total').textContent = formatCurrency(saleData.total);
         }
@@ -2016,13 +2025,6 @@
             if (closeButton) {
                 closeButton.remove();
             }
-
-            // Hide the discount row if no discount was applied (and it's currently showing 0.00)
-            const discountRowInPrint = tempReceiptContent.querySelector('#receipt-discount-row');
-            if (discountRowInPrint && discountRowInPrint.querySelector('#receipt-discount').textContent === '₱0.00') {
-                 discountRowInPrint.classList.add('hidden');
-            }
-
 
             const receiptContentForPrint = tempReceiptContent.innerHTML;
 
