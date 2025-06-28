@@ -1270,12 +1270,11 @@
 
             receiptModalContentTemplate.querySelector('#receipt-subtotal').textContent = formatCurrency(saleData.subtotal);
 
-            // Render discount row on receipt
+            // Render discount row on receipt - ALWAYS show the row, even if discount is zero
+            receiptDiscountRowEl.classList.remove('hidden'); // Ensure the row is visible
             if (saleData.couponApplied && saleData.discountAmount > 0) {
-                receiptDiscountRowEl.classList.remove('hidden');
                 receiptDiscountEl.textContent = formatCurrency(saleData.discountAmount);
             } else {
-                receiptDiscountRowEl.classList.add('hidden');
                 receiptDiscountEl.textContent = formatCurrency(0);
             }
 
@@ -1566,6 +1565,7 @@
             }
 
             // Generate a new unique ID for the product
+            // productCounter is now dynamically updated from Firestore to ensure uniqueness
             const newProductId = 'item-' + String(productCounter++).padStart(3, '0');
             const newProductData = {
                 name: name,
@@ -2017,7 +2017,7 @@
                 closeButton.remove();
             }
 
-            // Hide the discount row if no discount was applied
+            // Hide the discount row if no discount was applied (and it's currently showing 0.00)
             const discountRowInPrint = tempReceiptContent.querySelector('#receipt-discount-row');
             if (discountRowInPrint && discountRowInPrint.querySelector('#receipt-discount').textContent === '₱0.00') {
                  discountRowInPrint.classList.add('hidden');
@@ -2294,6 +2294,9 @@
                         const itemRefs = {}; // Store item references
                         const itemSnaps = {}; // Store item snapshots
 
+                        console.log(`[Void Sale] Initiating void for invoice ID: ${invoiceId}`);
+                        console.log("[Void Sale] Items to return:", itemsToReturn);
+
                         // --- PHASE 1: READ ALL NECESSARY DATA FIRST ---
                         // Get all inventory item documents for items in the voided sale
                         for (const soldItem of itemsToReturn) {
@@ -2302,7 +2305,9 @@
                             itemSnaps[soldItem.id] = await transaction.get(itemDocRef);
                             // If item doesn't exist, log warning but don't stop transaction for stock return
                             if (!itemSnaps[soldItem.id].exists()) {
-                                console.warn(`Void operation: Product ${soldItem.name} (ID: ${soldItem.id}) not found in inventory. Stock cannot be returned.`);
+                                console.warn(`[Void Sale] Product ${soldItem.name} (ID: ${soldItem.id}) not found in inventory. Stock cannot be returned.`);
+                            } else {
+                                console.log(`[Void Sale] Found inventory item ${soldItem.name}. Current stock: ${itemSnaps[soldItem.id].data().stock}`);
                             }
                         }
 
@@ -2313,18 +2318,19 @@
                                 const currentStock = itemSnaps[soldItem.id].data().stock;
                                 const newStock = currentStock + soldItem.quantity;
                                 transaction.update(itemRefs[soldItem.id], { stock: newStock });
+                                console.log(`[Void Sale] Updating stock for ${soldItem.name}: ${currentStock} -> ${newStock}`);
                             }
-                            // If it didn't exist, a warning was already logged, no update for it.
                         }
 
                         // Mark the sale as voided
                         transaction.update(saleDocRef, { isVoided: true, voidedAt: firebase.serverTimestamp() });
+                        console.log(`[Void Sale] Sale ${invoiceId} marked as voided.`);
                     });
 
                     showMessageBox('Sale Voided', `Sale ${invoiceId} has been successfully voided and stock returned.`);
                     // UI will update via onSnapshot listener
                 } catch (error) {
-                    console.error("Error voiding sale:", error);
+                    console.error("[Void Sale] Error voiding sale:", error);
                     showMessageBox('Error', `Failed to void sale: ${error.message || 'Please try again.'}`);
                 }
             }
@@ -2455,7 +2461,7 @@
                         <div>
                             <p class="font-semibold text-white">${log.salesInvoiceId} ${isVoided ? '(VOIDED)' : ''}</p>
                             <p class="text-gray-300">${logDate} ${logTime}</p>
-                            <p class="text-gray-400">Customer: ${log.customer.name}</p>
+                            <p class="text-400">Customer: ${log.customer.name}</p>
                             ${log.couponApplied ? `<p class="text-xs text-green-300">Coupon: ${log.couponApplied.code} (-${formatCurrency(log.discountAmount)})</p>` : ''}
                         </div>
                         <span class="text-lg font-bold text-blue-300">${formatCurrency(log.total)}</span>
@@ -2827,10 +2833,18 @@
             masterListLoadingEl.classList.remove('hidden'); // Also show loading for master list
             inventoryUnsubscribe = firebase.onSnapshot(inventoryCollectionRef, async (snapshot) => {
                 const fetchedInventory = [];
+                let maxProductIdNum = 0; // Initialize to track max product ID number
                 snapshot.forEach(doc => {
                     fetchedInventory.push({ id: doc.id, ...doc.data() });
+                    // Extract number from 'item-XXX' ID
+                    const match = doc.id.match(/^item-(\d+)$/);
+                    if (match && parseInt(match[1]) > maxProductIdNum) {
+                        maxProductIdNum = parseInt(match[1]);
+                    }
                 });
                 inventory = fetchedInventory; // Update global inventory array
+                productCounter = maxProductIdNum + 1; // Set productCounter for next unique ID
+
                 renderInventory(getFilteredInventory()); // Re-render current view with new data
                 renderMasterList(getFilteredMasterList()); // Re-render master list with new data
                 inventoryLoadingEl.classList.add('hidden');
