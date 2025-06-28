@@ -215,7 +215,7 @@
             <header id="main-header">
                 <div class="flex items-center space-x-4">
                     <!-- Custom logo based on user request -->
-                    <img src="https://scontent.fmnl17-2.fna.fbcdn.net/v/t39.30808-6/432725210_122115657752230587_8420052317826264936_n.jpg?_nc_cat=107&ccb=1-7&_nc_sid=6ee11a&_nc_eui2=AeFQuix_sgAinwvqEloWRmRrKmfC3maObI8qZ8LeZo5sj8vAQqr_JC9Fpw20JNKdwyGEmKxHmeCS13eK7cNozFC4&_nc_ohc=yXMR9-p-LkAQ7kNvwEGM_iE&_nc_oc=AdkR9Ic0Mv9IkLgZKC9xU5_Me3UPAFxAPa3C_vdUioSCL4JuWwbXpHRxqo946zUguqM&_nc_zt=23&_nc_ht=scontent.fmnl17-2.fna&_nc_gid=BW0dXenNjVSN0gfgFBLyNg&oh=00_AfNVOOLzzAt2XcEsqDJf0PXbRUm3bxfLEljZ6djGhEP5uw&oe=68620775" alt="Garahe ni Hulyo Logo" class="rounded-full w-12 h-12 object-cover">
+                    <img src="https://scontent.fmnl17-2.fna.fbcdn.net/v/t39.30808-6/432725210_122115657752230587_8420052317826264936_n.jpg?_nc_cat=107&ccb=1-7&_nc_sid=6ee11a&_nc_eui2=AeFQuix_sgAinwvqEloWRmRrKmfC3maObI8qZ8LeZo5sj8vAQqr_JC9Fpw20JNKdwyGEmKxHmeCS13eK7cNozFC4&_nc_ohc=yXMR9-p-LkAQ7kNvwEGM_iE&_nc_oc=AdkR9Ic0Mv9IkLgZKC9xU5_Me3UPAFxAPa3C_vdUioSCL4JuWwbXHRxqo946zUguqM&_nc_zt=23&_nc_ht=scontent.fmnl17-2.fna&_nc_gid=BW0dXenNjVSN0gfgFBLyNg&oh=00_AfNVOOLzzAt2XcEsqDJf0PXbRUm3bxfLEljZ6djGhEP5uw&oe=68620775" alt="Garahe ni Hulyo Logo" class="rounded-full w-12 h-12 object-cover">
                     <h1 class="text-3xl font-extrabold text-white">Garahe ni Hulyo POS System</h1>
                 </div>
                 <!-- User ID Display - Moved to header for visibility -->
@@ -1170,11 +1170,15 @@
             }
 
             // Sort logs by timestamp, newest first
-            const sortedLogs = [...salesLogs].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            const sortedLogs = [...salesLogs].sort((a, b) => {
+                const dateA = a.timestamp.toDate ? a.timestamp.toDate() : new Date(a.timestamp);
+                const dateB = b.timestamp.toDate ? b.timestamp.toDate() : new Date(b.timestamp);
+                return dateB - dateA;
+            });
 
             sortedLogs.forEach(log => {
-                const logDate = new Date(log.timestamp).toLocaleDateString();
-                const logTime = new Date(log.timestamp).toLocaleTimeString();
+                const logDate = (log.timestamp.toDate ? log.timestamp.toDate() : new Date(log.timestamp)).toLocaleDateString();
+                const logTime = (log.timestamp.toDate ? log.timestamp.toDate() : new Date(log.timestamp)).toLocaleTimeString();
                 const isVoided = log.isVoided ? true : false; // Ensure boolean
                 const voidedBadge = isVoided ? '<span class="ml-2 px-2 py-1 bg-red-600 text-white text-xs font-bold rounded-full">VOIDED</span>' : '';
                 const voidButtonHtml = (userRole === 'admin' && !isVoided) ?
@@ -1239,7 +1243,7 @@
          */
         function renderReceiptContent(saleData) {
             // Populate the receipt modal content template (receiptModalContentTemplate is the div itself)
-            const saleDateTime = new Date(saleData.timestamp);
+            const saleDateTime = saleData.timestamp.toDate ? saleData.timestamp.toDate() : new Date(saleData.timestamp);
             receiptModalContentTemplate.querySelector('#receipt-invoice-id').textContent = saleData.salesInvoiceId || 'N/A';
             receiptModalContentTemplate.querySelector('#receipt-date').textContent = saleDateTime.toLocaleDateString();
             receiptModalContentTemplate.querySelector('#receipt-time').textContent = saleDateTime.toLocaleTimeString();
@@ -2148,65 +2152,93 @@
                     // Generate a unique sales invoice ID
                     const salesInvoiceId = `INV-${salesInvoiceCounter++}-${Date.now().toString().slice(-4)}`;
 
-                    // Prepare sale data
-                    const completedSale = {
-                        salesInvoiceId: salesInvoiceId,
-                        customer: {
-                            name: customerName,
-                            address: customerAddress,
-                            contact: customerContact
-                        },
-                        items: JSON.parse(JSON.stringify(cart)), // Deep copy cart items
-                        subtotal: currentSubtotal,
-                        tax: 0, // Tax is now always 0
-                        total: currentTotal,
-                        couponApplied: appliedCoupon ? { ...appliedCoupon } : null, // Store applied coupon details
-                        discountAmount: currentDiscountAmount,
-                        timestamp: firebase.serverTimestamp() // Use server timestamp for consistency
-                    };
-
                     // Firestore Transaction for atomicity
                     await firebase.runTransaction(db, async (transaction) => {
-                        // 1. Update stock for each item in the cart
+                        const itemRefs = {};
+                        const itemSnaps = {};
+
+                        // --- PHASE 1: READ ALL NECESSARY DATA FIRST ---
+                        // 1. Get all inventory item documents for items in the cart
                         for (const cartItem of cart) {
                             const itemDocRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/inventory`, cartItem.id);
-                            const itemDocSnap = await transaction.get(itemDocRef);
-
-                            if (!itemDocSnap.exists()) {
-                                throw new Error(`Product ${cartItem.name} not found in inventory during checkout.`);
+                            itemRefs[cartItem.id] = itemDocRef; // Store reference
+                            itemSnaps[cartItem.id] = await transaction.get(itemDocRef); // Get snapshot
+                            if (!itemSnaps[cartItem.id].exists()) {
+                                throw new Error(`Product ${cartItem.name} not found in inventory.`);
                             }
+                        }
 
-                            const currentStock = itemDocSnap.data().stock;
+                        // 2. If a coupon is applied, get the coupon document
+                        let couponDocRef = null;
+                        let couponDocSnap = null;
+                        if (appliedCoupon) {
+                            couponDocRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/coupons`, appliedCoupon.id);
+                            couponDocSnap = await transaction.get(couponDocRef);
+
+                            if (!couponDocSnap.exists()) {
+                                throw new Error(`Applied coupon ${appliedCoupon.code} not found or expired.`);
+                            }
+                            // Re-validate the coupon within the transaction for absolute certainty
+                            const couponData = couponDocSnap.data();
+                            if (!isValidCoupon(couponData, true)) { // Check usage limit here too
+                                throw new Error(`Coupon "${appliedCoupon.code}" is no longer valid.`);
+                            }
+                        }
+
+                        // --- PHASE 2: PERFORM ALL WRITE OPERATIONS ---
+                        // 1. Update stock for each item in the cart
+                        for (const cartItem of cart) {
+                            const currentStock = itemSnaps[cartItem.id].data().stock;
                             const newStock = currentStock - cartItem.quantity;
 
                             if (newStock < 0) {
                                 throw new Error(`Insufficient stock for ${cartItem.name}. Available: ${currentStock}, Needed: ${cartItem.quantity}.`);
                             }
-                            transaction.update(itemDocRef, { stock: newStock });
+                            transaction.update(itemRefs[cartItem.id], { stock: newStock });
                         }
 
                         // 2. Increment coupon usage count if a coupon was applied
-                        if (appliedCoupon) {
-                            const couponDocRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/coupons`, appliedCoupon.id);
-                            const couponDocSnap = await transaction.get(couponDocRef);
-
-                            if (!couponDocSnap.exists()) {
-                                throw new Error(`Applied coupon ${appliedCoupon.code} not found.`);
-                            }
-
+                        if (appliedCoupon && couponDocRef) { // Ensure couponDocRef is valid
                             const currentUsedCount = couponDocSnap.data().usedCount || 0;
                             const newUsedCount = currentUsedCount + 1;
-
                             transaction.update(couponDocRef, { usedCount: newUsedCount });
                         }
 
                         // 3. Add the completed sale to sales logs
+                        const completedSale = {
+                            salesInvoiceId: salesInvoiceId,
+                            customer: {
+                                name: customerName,
+                                address: customerAddress,
+                                contact: customerContact
+                            },
+                            items: JSON.parse(JSON.stringify(cart)), // Deep copy cart items
+                            subtotal: currentSubtotal,
+                            tax: 0, // Tax is now always 0
+                            total: currentTotal,
+                            couponApplied: appliedCoupon ? { ...appliedCoupon } : null, // Store applied coupon details
+                            discountAmount: currentDiscountAmount,
+                            timestamp: firebase.serverTimestamp() // Use server timestamp for consistency
+                        };
                         await transaction.set(firebase.doc(firebase.collection(db, `artifacts/${currentAppId}/public/data/salesLogs`), salesInvoiceId), completedSale);
                     });
 
                     showMessageBox('Sale Complete', `Sale finalized successfully! Invoice ID: ${salesInvoiceId}`);
                     closeSaleSummaryModal(); // Close the checkout summary modal
-                    displayReceiptModal(completedSale); // Show the receipt in a modal
+                    // The cart will be cleared when the receipt modal is closed or a new sale is initiated.
+                    displayReceiptModal(
+                        {
+                            salesInvoiceId: salesInvoiceId,
+                            customer: { name: customerName, address: customerAddress, contact: customerContact },
+                            items: JSON.parse(JSON.stringify(cart)),
+                            subtotal: currentSubtotal,
+                            tax: 0,
+                            total: currentTotal,
+                            couponApplied: appliedCoupon ? { ...appliedCoupon } : null,
+                            discountAmount: currentDiscountAmount,
+                            timestamp: new Date() // Use local date for immediate display, server timestamp is for Firestore
+                        }
+                    );
 
                 } catch (error) {
                     console.error("Error finalizing sale:", error);
@@ -2254,21 +2286,33 @@
                             throw new Error('Sale not found or already voided.');
                         }
 
-                        const itemsToReturn = saleDocSnap.data().items;
+                        const saleData = saleDocSnap.data();
+                        const itemsToReturn = saleData.items;
 
-                        // Return stock for each item in the voided sale
+                        const itemRefs = {}; // Store item references
+                        const itemSnaps = {}; // Store item snapshots
+
+                        // --- PHASE 1: READ ALL NECESSARY DATA FIRST ---
+                        // Get all inventory item documents for items in the voided sale
                         for (const soldItem of itemsToReturn) {
                             const itemDocRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/inventory`, soldItem.id);
-                            const itemDocSnap = await transaction.get(itemDocRef);
-
-                            if (itemDocSnap.exists()) {
-                                const currentStock = itemDocSnap.data().stock;
-                                const newStock = currentStock + soldItem.quantity;
-                                transaction.update(itemDocRef, { stock: newStock });
-                            } else {
-                                console.warn(`Void operation: Product ${soldItem.name} (ID: ${soldItem.id}) not found in inventory. Stock not returned.`);
-                                // Don't throw an error, allow the void to proceed for the sale record itself
+                            itemRefs[soldItem.id] = itemDocRef;
+                            itemSnaps[soldItem.id] = await transaction.get(itemDocRef);
+                            // If item doesn't exist, log warning but don't stop transaction for stock return
+                            if (!itemSnaps[soldItem.id].exists()) {
+                                console.warn(`Void operation: Product ${soldItem.name} (ID: ${soldItem.id}) not found in inventory. Stock cannot be returned.`);
                             }
+                        }
+
+                        // --- PHASE 2: PERFORM ALL WRITE OPERATIONS ---
+                        // Return stock for each item in the voided sale
+                        for (const soldItem of itemsToReturn) {
+                            if (itemSnaps[soldItem.id] && itemSnaps[soldItem.id].exists()) {
+                                const currentStock = itemSnaps[soldItem.id].data().stock;
+                                const newStock = currentStock + soldItem.quantity;
+                                transaction.update(itemRefs[soldItem.id], { stock: newStock });
+                            }
+                            // If it didn't exist, a warning was already logged, no update for it.
                         }
 
                         // Mark the sale as voided
@@ -2304,7 +2348,7 @@
             if (currentReportFilter === 'daily') {
                 periodText = `Today (${now.toLocaleDateString()})`;
                 filteredSales = nonVoidedSales.filter(log => {
-                    const logDate = new Date(log.timestamp.toDate ? log.timestamp.toDate() : log.timestamp); // Handle Firestore Timestamp objects
+                    const logDate = log.timestamp.toDate ? log.timestamp.toDate() : new Date(log.timestamp); // Handle Firestore Timestamp objects
                     return logDate.toDateString() === now.toDateString();
                 });
             } else if (currentReportFilter === 'weekly') {
@@ -2320,7 +2364,7 @@
 
                 periodText = `This Week (${startOfWeek.toLocaleDateString()} - ${endOfWeek.toLocaleDateString()})`;
                 filteredSales = nonVoidedSales.filter(log => {
-                    const logDate = new Date(log.timestamp.toDate ? log.timestamp.toDate() : log.timestamp);
+                    const logDate = log.timestamp.toDate ? log.timestamp.toDate() : new Date(log.timestamp);
                     return logDate >= startOfWeek && logDate <= endOfWeek;
                 });
             } else if (currentReportFilter === 'monthly') {
@@ -2334,7 +2378,7 @@
 
                 periodText = `This Month (${startOfMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })})`;
                 filteredSales = nonVoidedSales.filter(log => {
-                    const logDate = new Date(log.timestamp.toDate ? log.timestamp.toDate() : log.timestamp);
+                    const logDate = log.timestamp.toDate ? log.timestamp.toDate() : new Date(log.timestamp);
                     return logDate >= startOfMonth && logDate <= endOfMonth;
                 });
             }
@@ -2388,11 +2432,15 @@
             } else {
                 // Add a header for individual sales logs if there are any
                 reportDetailsListEl.innerHTML = `<h4 class="text-xl font-semibold text-blue-300 mb-4">Individual Sales Logs:</h4>`;
-                filteredSales.sort((a, b) => new Date(b.timestamp.toDate ? b.timestamp.toDate() : b.timestamp) - new Date(a.timestamp.toDate ? a.timestamp.toDate() : a.timestamp));
+                filteredSales.sort((a, b) => {
+                    const dateA = a.timestamp.toDate ? a.timestamp.toDate() : new Date(a.timestamp);
+                    const dateB = b.timestamp.toDate ? b.timestamp.toDate() : new Date(b.timestamp);
+                    return dateB - dateA;
+                });
 
                 filteredSales.forEach(log => {
-                    const logDate = new Date(log.timestamp.toDate ? log.timestamp.toDate() : log.timestamp).toLocaleDateString();
-                    const logTime = new Date(log.timestamp.toDate ? log.timestamp.toDate() : log.timestamp).toLocaleTimeString();
+                    const logDate = (log.timestamp.toDate ? log.timestamp.toDate() : new Date(log.timestamp)).toLocaleDateString();
+                    const logTime = (log.timestamp.toDate ? log.timestamp.toDate() : new Date(log.timestamp)).toLocaleTimeString();
                     const isVoided = log.isVoided ? true : false;
                     const voidedClass = isVoided ? 'opacity-70 text-red-300' : '';
 
@@ -2576,8 +2624,8 @@
             const code = newCouponCodeEl.value.trim().toUpperCase();
             const type = newCouponTypeEl.value;
             const value = parseFloat(newCouponValueEl.value);
-            const validFrom = newCouponValidFromEl.value; // YYYY-MM-DD string
-            const validUntil = newCouponValidUntilEl.value; // YYYY-MM-DD string
+            const validFrom = newCouponValidFromEl.value; //YYYY-MM-DD string
+            const validUntil = newCouponValidUntilEl.value; //YYYY-MM-DD string
             const usageLimit = parseInt(newCouponUsageLimitEl.value);
 
             // Basic Validation
