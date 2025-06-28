@@ -268,6 +268,7 @@
                     <!-- Inventory List -->
                     <div id="inventory-list" class="flex-1 overflow-y-auto pr-2">
                         <!-- Inventory items will be rendered here by JavaScript -->
+                        <p class="text-gray-400 text-center py-8" id="empty-inventory-message">No inventory items found. Add some from 'Manage Products'!</p>
                     </div>
                 </div>
 
@@ -819,6 +820,7 @@
         let couponCodeInputEl, applyCouponBtn, couponStatusMessageEl, appliedDiscountEl, appliedDiscountDisplayRowEl; // New coupon application elements
         let couponManagementContentEl, newCouponCodeEl, newCouponTypeEl, newCouponValueEl, newCouponValidFromEl, newCouponValidUntilEl, newCouponUsageLimitEl, createNewCouponBtn; // New coupon creation elements
         let existingCouponsListEl, emptyCouponsMessageEl; // Existing coupons display
+        let emptyInventoryMessageEl; // New: Empty inventory message element
 
         // --- Helper Functions ---
 
@@ -882,10 +884,10 @@
             inventoryListEl.innerHTML = ''; // Clear existing items
 
             if (items.length === 0) {
-                inventoryListEl.innerHTML = `
-                    <p class="text-gray-400 text-center py-8">No inventory items found matching your search.</p>
-                `;
+                emptyInventoryMessageEl.classList.remove('hidden'); // Show empty message
                 return;
+            } else {
+                emptyInventoryMessageEl.classList.add('hidden'); // Hide empty message
             }
 
             // Sort items alphabetically by name
@@ -2834,30 +2836,8 @@
                 inventoryLoadingEl.classList.add('hidden');
                 masterListLoadingEl.classList.add('hidden');
 
-                // If inventory is empty, populate it with initial data (one-time operation)
-                if (inventory.length === 0) {
-                    const initialData = [
-                        { id: 'item-001', name: 'Spark Plug (Iridium)', price: 12.99, stock: 150, restockLevel: 20, imageUrl: 'https://placehold.co/80x80/000000/FFFFFF?text=Plug' },
-                        { id: 'item-002', name: 'Engine Oil (Synthetic)', price: 35.50, stock: 80, restockLevel: 15, imageUrl: 'https://placehold.co/80x80/000000/FFFFFF?text=Oil' },
-                        { id: 'item-003', name: 'Brake Pad Set (Front)', price: 59.95, stock: 60, restockLevel: 10, imageUrl: 'https://placehold.co/80x80/000000/FFFFFF?text=Brake' },
-                        { id: 'item-004', name: 'Oil Filter (Premium)', price: 8.75, stock: 200, restockLevel: 25, imageUrl: 'https://placehold.co/80x80/000000/FFFFFF?text=Filter' },
-                        { id: 'item-005', name: 'Air Filter (Performance)', price: 25.00, stock: 90, restockLevel: 15, imageUrl: 'https://placehold.co/80x80/000000/FFFFFF?text=Air' },
-                        { id: 'item-010', name: 'Mirror Set (Custom)', price: 45.00, stock: 25, restockLevel: 5, imageUrl: 'https://placehold.co/80x80/000000/FFFFFF?text=Mirror' },
-                        { id: 'item-011', name: 'Helmet (Full Face)', price: 199.99, stock: 15, restockLevel: 3, imageUrl: 'https://placehold.co/80x80/000000/FFFFFF?text=Helmet' },
-                        { id: 'item-012', name: 'Jacket (Riding Gear)', price: 150.00, stock: 20, restockLevel: 5, imageUrl: 'https://placehold.co/80x80/000000/FFFFFF?text=Jacket' },
-                    ];
-                    // Add initial data if the collection is truly empty
-                    const existingDocs = await firebase.getDocs(inventoryCollectionRef);
-                    if (existingDocs.empty) {
-                        for (const item of initialData) {
-                            try {
-                                await firebase.setDoc(firebase.doc(db, `artifacts/${currentAppId}/public/data/inventory`, item.id), item);
-                            } catch (e) {
-                                console.error("Error setting initial inventory item:", item.id, e);
-                            }
-                        }
-                    }
-                }
+                // Removed initial data population
+                // The inventory will now truly be empty if the collection is empty.
             }, (error) => {
                 console.error("Error listening to inventory:", error);
                 // Only show data error if user is logged in, as guests won't have access anyway
@@ -3133,6 +3113,7 @@
             totalEl = document.getElementById('total');
             inventorySearchEl = document.getElementById('inventory-search');
             checkoutButtonEl = document.getElementById('checkout-button');
+            emptyInventoryMessageEl = document.getElementById('empty-inventory-message'); // Get new element
 
             tabInventoryBtn = document.getElementById('tab-inventory');
             tabManageProductsBtn = document.getElementById('tab-manage-products');
