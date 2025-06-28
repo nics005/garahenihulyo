@@ -177,7 +177,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, updateDoc, addDoc, deleteDoc, onSnapshot, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, addDoc, deleteDoc, onSnapshot, collection, query, where, getDocs, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Expose Firebase objects globally for use in the main script
         window.firebase = {
@@ -200,7 +200,9 @@
             collection,
             query,
             where,
-            getDocs
+            getDocs,
+            runTransaction,     // Added for transactions (e.g., voiding sale)
+            serverTimestamp     // Added for server timestamps
         };
     </script>
 </head>
@@ -231,6 +233,7 @@
                     <button id="tab-inventory-master" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200 admin-only">Inventory Master</button>
                     <button id="tab-report-logs" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200 admin-only">Report Logs</button>
                     <button id="tab-sales-report" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200 admin-only">Sales Report</button>
+                    <button id="tab-coupon-management" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200 admin-only">Coupon Management</button>
                     <button id="tab-user-management" class="tab-button px-5 py-2 rounded-md font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition duration-200 admin-only">User Management</button>
                 </div>
 
@@ -339,6 +342,61 @@
                     </button>
                 </div>
 
+                <!-- Coupon Management Content Area -->
+                <div id="coupon-management-content" class="tab-content hidden flex-1 flex-col admin-only-content">
+                    <h1 class="text-3xl font-bold text-white mb-6 text-center">Coupon Management</h1>
+                    <div class="mb-6 p-6 bg-gray-800 rounded-lg shadow-md border border-gray-700">
+                        <h3 class="text-xl font-bold text-white mb-4">Create New Coupon</h3>
+                        <div class="mb-4">
+                            <label for="new-coupon-code" class="block text-gray-300 text-sm font-bold mb-2">Coupon Code:</label>
+                            <input type="text" id="new-coupon-code" placeholder="e.g., SAVE10, FREESHIP"
+                                   class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-600">
+                        </div>
+                        <div class="mb-4">
+                            <label for="new-coupon-type" class="block text-gray-300 text-sm font-bold mb-2">Discount Type:</label>
+                            <select id="new-coupon-type"
+                                    class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-600">
+                                <option value="fixed">Fixed Amount (₱)</option>
+                                <option value="percentage">Percentage (%)</option>
+                            </select>
+                        </div>
+                        <div class="mb-4">
+                            <label for="new-coupon-value" class="block text-gray-300 text-sm font-bold mb-2">Discount Value:</label>
+                            <input type="number" id="new-coupon-value" min="0" step="0.01" placeholder="e.g., 10.00 or 5"
+                                   class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-600">
+                        </div>
+                        <div class="mb-4">
+                            <label for="new-coupon-valid-from" class="block text-gray-300 text-sm font-bold mb-2">Valid From:</label>
+                            <input type="date" id="new-coupon-valid-from"
+                                   class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-600">
+                        </div>
+                        <div class="mb-6">
+                            <label for="new-coupon-valid-until" class="block text-gray-300 text-sm font-bold mb-2">Valid Until:</label>
+                            <input type="date" id="new-coupon-valid-until"
+                                   class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-600">
+                        </div>
+                        <div class="mb-6">
+                            <label for="new-coupon-usage-limit" class="block text-gray-300 text-sm font-bold mb-2">Usage Limit (0 for unlimited):</label>
+                            <input type="number" id="new-coupon-usage-limit" min="0" value="0"
+                                   class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-600">
+                        </div>
+                        <button id="create-new-coupon-btn"
+                                class="w-full py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold
+                                       rounded-lg shadow-lg transform transition duration-200 hover:scale-105
+                                       focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800">
+                            Create Coupon
+                        </button>
+                    </div>
+
+                    <div class="p-6 bg-gray-800 rounded-lg shadow-md border border-gray-700 flex-1 overflow-y-auto">
+                        <h3 class="text-xl font-bold text-white mb-4">Existing Coupons</h3>
+                        <div id="existing-coupons-list">
+                            <p class="text-gray-400 text-center py-8" id="empty-coupons-message">No coupons created yet.</p>
+                            <!-- Existing coupons will be rendered here -->
+                        </div>
+                    </div>
+                </div>
+
                 <!-- User Management Content Area -->
                 <div id="user-management-content" class="tab-content hidden flex-1 flex-col admin-only-content">
                     <h1 class="text-3xl font-bold text-white mb-6 text-center">User Management</h1>
@@ -394,6 +452,26 @@
                         <span class="text-2xl font-bold text-blue-400">Total:</span>
                         <span id="total" class="text-3xl font-extrabold text-blue-300">₱0.00</span>
                     </div>
+
+                    <!-- Coupon application section -->
+                    <div class="mb-4 p-3 bg-gray-700 rounded-lg border border-gray-600">
+                        <label for="coupon-code-input" class="block text-gray-300 text-sm font-bold mb-2">Apply Coupon:</label>
+                        <div class="flex space-x-2">
+                            <input type="text" id="coupon-code-input" placeholder="Enter code"
+                                   class="flex-grow p-2 rounded-md bg-gray-800 border border-gray-700 text-gray-200 placeholder-gray-500
+                                          focus:outline-none focus:ring-1 focus:ring-blue-500">
+                            <button id="apply-coupon-btn"
+                                    class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 active:bg-blue-700 transition duration-200">
+                                Apply
+                            </button>
+                        </div>
+                        <p id="coupon-status-message" class="text-xs mt-2 text-gray-400"></p>
+                        <div class="flex justify-between items-center mt-2" id="applied-discount-display-row">
+                            <span class="text-md text-gray-300">Discount:</span>
+                            <span id="applied-discount" class="text-lg font-semibold text-green-400">₱0.00</span>
+                        </div>
+                    </div>
+
 
                     <!-- Checkout Button -->
                     <button id="checkout-button"
@@ -624,6 +702,10 @@
                     <span id="summary-subtotal" class="text-xl font-semibold text-white">₱0.00</span>
                 </div>
                 <!-- Tax div removed from summary modal -->
+                <div class="flex justify-between items-center mt-2" id="summary-discount-display-row">
+                    <span class="text-lg text-gray-300">Discount:</span>
+                    <span id="summary-applied-discount" class="text-xl font-semibold text-green-400">₱0.00</span>
+                </div>
                 <div class="flex justify-between items-center mb-4">
                     <span class="text-2xl font-bold text-blue-400">Total:</span>
                     <span id="summary-total" class="text-3xl font-extrabold text-blue-300">₱0.00</span>
@@ -669,6 +751,11 @@
                     <span>Subtotal:</span>
                     <span id="receipt-subtotal" class="font-semibold text-white"></span>
                 </div>
+                <!-- Discount row on receipt -->
+                <div class="flex justify-between text-lg mb-1 text-gray-300" id="receipt-discount-row">
+                    <span>Discount:</span>
+                    <span id="receipt-discount" class="font-semibold text-green-400"></span>
+                </div>
                 <!-- Tax div removed from receipt -->
                 <div class="flex justify-between text-xl font-bold mt-2 text-blue-400">
                     <span>Total:</span>
@@ -703,16 +790,18 @@
         let inventory = []; // Fetched from Firestore
         let cart = []; // Still in-memory for current transaction
         let salesLogs = []; // Fetched from Firestore
+        let coupons = [];   // New: Fetched from Firestore for coupon management
 
         const TAX_RATE = 0; // Changed to 0 as per request
         let productCounter = 1; // Will be determined by existing Firestore product IDs
         let salesInvoiceCounter = 1001; // Will be determined by existing Firestore sales log IDs
         let currentReportFilter = 'daily'; // Default filter for sales report
+        let appliedCoupon = null; // New: Stores the currently applied coupon object
 
         // --- DOM Elements (Declared with 'let' and assigned inside window.onload) ---
         let appContentWrapperEl; // New wrapper element
         let inventoryListEl, cartListEl, emptyCartMessageEl, subtotalEl, totalEl, inventorySearchEl, checkoutButtonEl;
-        let tabInventoryBtn, tabManageProductsBtn, tabInventoryMasterBtn, tabReportLogsBtn, tabSalesReportBtn, tabUserManagementBtn;
+        let tabInventoryBtn, tabManageProductsBtn, tabInventoryMasterBtn, tabReportLogsBtn, tabSalesReportBtn, tabUserManagementBtn, tabCouponManagementBtn; // Added coupon tab
         let inventoryContentEl, inventoryMasterContentEl, masterListEl, masterListSearchEl, masterListLoadingEl;
         let reportLogsContentEl, salesLogListEl, emptyLogsMessageEl, inventoryLoadingEl, salesLogLoadingEl, userIdDisplayEl;
         let messageBoxContainerEl, messageBoxTitleEl, messageBoxTextEl, messageBoxOkBtn, messageBoxCancelBtn;
@@ -722,11 +811,14 @@
         let modalNewProductNameEl, modalNewProductPriceEl, modalNewProductStockEl, modalNewProductRestockLevelEl, modalNewProductImageEl, modalImagePreviewEl, modalAddProductBtn;
         let modalRestockSearchEl, modalRestockListEl, modalApplyRestockBtn;
         let editProductDetailsModalContainer, editProductDetailsModalCloseBtn, editProductNameEl, editProductPriceEl, editProductStockEl, editProductRestockLevelEl, editProductImageEl, editImagePreviewEl, editProductSaveBtn;
-        let saleSummaryModalContainer, saleSummaryModalCloseBtn, customerNameEl, customerAddressEl, customerContactEl, saleSummaryItemsListEl, summarySubtotalEl, summaryTotalEl, saleSummaryCancelBtn, saleSummaryCheckoutBtn;
-        let receiptModalContainer, receiptModalContentTemplate, activeReceiptPrintBtn, activeReceiptNewSaleBtn, receiptCloseBtn;
+        let saleSummaryModalContainer, saleSummaryModalCloseBtn, customerNameEl, customerAddressEl, customerContactEl, saleSummaryItemsListEl, summarySubtotalEl, summaryTotalEl, saleSummaryCancelBtn, saleSummaryCheckoutBtn, summaryAppliedDiscountEl; // Added summary applied discount
+        let receiptModalContainer, receiptModalContentTemplate, activeReceiptPrintBtn, activeReceiptNewSaleBtn, receiptCloseBtn, receiptDiscountEl, receiptDiscountRowEl; // Added receipt discount
         let salesReportContentEl, filterDailyBtn, filterWeeklyBtn, filterMonthlyBtn, reportTotalSalesEl, reportPeriodInfoEl, reportDetailsListEl, emptyReportMessageEl, emptyItemsSummaryMessageEl, downloadReportPdfBtn, reportItemsSummaryEl;
         let loginLogoutButtonEl, loginModalContainerEl, loginEmailEl, loginPasswordEl, loginSubmitBtnEl, currentUserRoleEl; // New elements for login
         let userManagementContentEl, newUserEmailEl, newUserPasswordEl, newUserRoleEl, addNewUserBtnEl; // New elements for user management
+        let couponCodeInputEl, applyCouponBtn, couponStatusMessageEl, appliedDiscountEl, appliedDiscountDisplayRowEl; // New coupon application elements
+        let couponManagementContentEl, newCouponCodeEl, newCouponTypeEl, newCouponValueEl, newCouponValidFromEl, newCouponValidUntilEl, newCouponUsageLimitEl, createNewCouponBtn; // New coupon creation elements
+        let existingCouponsListEl, emptyCouponsMessageEl; // Existing coupons display
 
         // --- Helper Functions ---
 
@@ -849,12 +941,22 @@
                 emptyCartMessageEl.classList.remove('hidden');
                 checkoutButtonEl.disabled = true;
                 checkoutButtonEl.classList.add('opacity-50', 'cursor-not-allowed');
+                appliedCoupon = null; // Clear applied coupon if cart is empty
+                couponCodeInputEl.value = '';
+                couponStatusMessageEl.textContent = '';
+                appliedDiscountDisplayRowEl.classList.add('hidden'); // Hide discount row
                 calculateTotals(); // Ensure totals are zeroed out
                 return;
             } else {
                 emptyCartMessageEl.classList.add('hidden');
                 checkoutButtonEl.disabled = false;
                 checkoutButtonEl.classList.remove('opacity-50', 'cursor-not-allowed');
+                // Show discount row only if a coupon is applied
+                if (appliedCoupon) {
+                    appliedDiscountDisplayRowEl.classList.remove('hidden');
+                } else {
+                    appliedDiscountDisplayRowEl.classList.add('hidden');
+                }
             }
 
             cart.forEach(item => {
@@ -1073,24 +1175,36 @@
             sortedLogs.forEach(log => {
                 const logDate = new Date(log.timestamp).toLocaleDateString();
                 const logTime = new Date(log.timestamp).toLocaleTimeString();
+                const isVoided = log.isVoided ? true : false; // Ensure boolean
+                const voidedBadge = isVoided ? '<span class="ml-2 px-2 py-1 bg-red-600 text-white text-xs font-bold rounded-full">VOIDED</span>' : '';
+                const voidButtonHtml = (userRole === 'admin' && !isVoided) ?
+                    `<button data-invoice-id="${log.salesInvoiceId}"
+                            class="void-sale-btn px-3 py-1 bg-red-600 text-white rounded-lg
+                                   hover:bg-red-700 active:bg-red-800 transition duration-200
+                                   shadow-md text-sm mt-2 sm:mt-0">
+                        Void Sale
+                    </button>` : '';
 
                 const logItemDiv = document.createElement('div');
                 logItemDiv.className = `
                     bg-gray-800 rounded-lg p-4 mb-4 shadow-md border border-gray-700
                     flex flex-col sm:flex-row justify-between items-center transition-all duration-200
-                    hover:scale-[1.01] hover:bg-gray-700
+                    hover:scale-[1.01] hover:bg-gray-700 ${isVoided ? 'opacity-70 border-red-500' : ''}
                 `;
                 logItemDiv.innerHTML = `
                     <div class="flex-1 text-left mb-2 sm:mb-0">
                         <p class="text-gray-300 text-sm">Invoice ID:
                             <span class="sales-invoice-id font-bold text-blue-400 cursor-pointer hover:underline"
                                   data-invoice-id="${log.salesInvoiceId}">${log.salesInvoiceId}</span>
+                            ${voidedBadge}
                         </p>
                         <p class="text-gray-400 text-sm">Date: ${logDate} | Time: ${logTime}</p>
                         <p class="text-gray-200 font-semibold">Customer: ${log.customer.name}</p>
                     </div>
-                    <div class="text-right">
+                    <div class="text-right flex flex-col items-end">
                         <p class="text-2xl font-bold text-white">${formatCurrency(log.total)}</p>
+                        ${log.couponApplied ? `<p class="text-sm text-green-400">(Discount: ${formatCurrency(log.discountAmount)})</p>` : ''}
+                        ${voidButtonHtml}
                     </div>
                 `;
                 salesLogListEl.appendChild(logItemDiv);
@@ -1106,6 +1220,14 @@
                     } else {
                         showMessageBox('Error', 'Sales record not found.');
                     }
+                });
+            });
+
+            // Add event listeners for Void Sale buttons
+            document.querySelectorAll('.void-sale-btn').forEach(button => {
+                button.addEventListener('click', async (event) => {
+                    const invoiceId = event.target.dataset.invoiceId;
+                    await voidSale(invoiceId);
                 });
             });
         }
@@ -1141,7 +1263,16 @@
             });
 
             receiptModalContentTemplate.querySelector('#receipt-subtotal').textContent = formatCurrency(saleData.subtotal);
-            // Removed tax line from receipt rendering
+
+            // Render discount row on receipt
+            if (saleData.couponApplied && saleData.discountAmount > 0) {
+                receiptDiscountRowEl.classList.remove('hidden');
+                receiptDiscountEl.textContent = formatCurrency(saleData.discountAmount);
+            } else {
+                receiptDiscountRowEl.classList.add('hidden');
+                receiptDiscountEl.textContent = formatCurrency(0);
+            }
+
             receiptModalContentTemplate.querySelector('#receipt-total').textContent = formatCurrency(saleData.total);
         }
 
@@ -1156,15 +1287,26 @@
             });
 
             const tax = subtotal * TAX_RATE; // TAX_RATE is now 0
-            const total = subtotal + tax;
+            let total = subtotal + tax;
+            let discountAmount = 0;
+
+            if (appliedCoupon) {
+                if (appliedCoupon.type === 'percentage') {
+                    discountAmount = total * (appliedCoupon.value / 100);
+                } else if (appliedCoupon.type === 'fixed') {
+                    discountAmount = appliedCoupon.value;
+                }
+                // Ensure discount doesn't make total negative
+                total = Math.max(0, total - discountAmount);
+            }
 
             subtotalEl.textContent = formatCurrency(subtotal);
-            // taxEl.textContent = formatCurrency(tax); // This will now always be ₱0.00 - REMOVED
             totalEl.textContent = formatCurrency(total);
+            appliedDiscountEl.textContent = formatCurrency(discountAmount); // Update discount display in cart
 
             // Also update summary modal totals
             summarySubtotalEl.textContent = formatCurrency(subtotal);
-            // summaryTaxEl.textContent = formatCurrency(tax); // This will now always be ₱0.00 - REMOVED
+            summaryAppliedDiscountEl.textContent = formatCurrency(discountAmount); // Update discount display in summary
             summaryTotalEl.textContent = formatCurrency(total);
         }
 
@@ -1643,7 +1785,7 @@
 
         /**
          * Switches the active main tab and displays the corresponding content.
-         * @param {string} tabName - The name of the tab to activate ('inventory', 'manage-products', 'inventory-master', 'report-logs', 'sales-report', 'user-management').
+         * @param {string} tabName - The name of the tab to activate ('inventory', 'manage-products', 'inventory-master', 'report-logs', 'sales-report', 'user-management', 'coupon-management').
          */
         function switchMainTab(tabName) {
             // Hide all main content divs
@@ -1651,7 +1793,8 @@
             inventoryMasterContentEl.classList.add('hidden');
             reportLogsContentEl.classList.add('hidden');
             salesReportContentEl.classList.add('hidden');
-            userManagementContentEl.classList.add('hidden'); // Hide user management
+            userManagementContentEl.classList.add('hidden');
+            couponManagementContentEl.classList.add('hidden'); // Hide coupon management
 
             // Deactivate all main tab buttons
             tabInventoryBtn.classList.remove('active');
@@ -1659,7 +1802,8 @@
             tabInventoryMasterBtn.classList.remove('active');
             tabReportLogsBtn.classList.remove('active');
             tabSalesReportBtn.classList.remove('active');
-            tabUserManagementBtn.classList.remove('active'); // Deactivate user management button
+            tabCouponManagementBtn.classList.remove('active'); // Deactivate coupon tab
+            tabUserManagementBtn.classList.remove('active');
 
             // Show relevant content and activate relevant button
             if (tabName === 'inventory') {
@@ -1701,7 +1845,16 @@
                     showMessageBox('Access Denied', 'You do not have permission to view sales reports.');
                     switchMainTab('inventory');
                 }
-            } else if (tabName === 'user-management') { // New case for User Management
+            } else if (tabName === 'coupon-management') { // New case for Coupon Management
+                if (userRole === 'admin') {
+                    couponManagementContentEl.classList.remove('hidden');
+                    tabCouponManagementBtn.classList.add('active');
+                    renderCoupons(); // Render coupons when this tab is opened
+                } else {
+                    showMessageBox('Access Denied', 'You do not have permission to manage coupons.');
+                    switchMainTab('inventory');
+                }
+            } else if (tabName === 'user-management') {
                 if (userRole === 'admin') {
                     userManagementContentEl.classList.remove('hidden');
                     tabUserManagementBtn.classList.add('active');
@@ -1782,6 +1935,11 @@
             customerNameEl.value = '';
             customerAddressEl.value = '';
             customerContactEl.value = '';
+            // Reset applied coupon when closing summary modal without finalizing
+            appliedCoupon = null;
+            couponCodeInputEl.value = '';
+            couponStatusMessageEl.textContent = '';
+            calculateTotals(); // Recalculate totals to remove discount
         }
 
         /**
@@ -1821,6 +1979,9 @@
 
             // After closing the receipt, clear the cart for a new sale
             cart = [];
+            appliedCoupon = null; // Clear applied coupon after sale
+            couponCodeInputEl.value = '';
+            couponStatusMessageEl.textContent = '';
             renderCart();
             // Switch back to inventory tab
             switchMainTab('inventory');
@@ -1849,6 +2010,13 @@
             if (closeButton) {
                 closeButton.remove();
             }
+
+            // Hide the discount row if no discount was applied
+            const discountRowInPrint = tempReceiptContent.querySelector('#receipt-discount-row');
+            if (discountRowInPrint && discountRowInPrint.querySelector('#receipt-discount').textContent === '₱0.00') {
+                 discountRowInPrint.classList.add('hidden');
+            }
+
 
             const receiptContentForPrint = tempReceiptContent.innerHTML;
 
@@ -1965,9 +2133,13 @@
                 return;
             }
 
+            const currentSubtotal = parseFloat(summarySubtotalEl.textContent.replace('₱', ''));
+            const currentTotal = parseFloat(summaryTotalEl.textContent.replace('₱', ''));
+            const currentDiscountAmount = parseFloat(summaryAppliedDiscountEl.textContent.replace('₱', ''));
+
             const confirmed = await showMessageBox(
                 'Confirm Final Checkout',
-                `Proceed with checkout for ${summaryTotalEl.textContent}?`,
+                `Proceed with checkout for ${formatCurrency(currentTotal)}?`,
                 true
             );
 
@@ -1976,7 +2148,7 @@
                     // Generate a unique sales invoice ID
                     const salesInvoiceId = `INV-${salesInvoiceCounter++}-${Date.now().toString().slice(-4)}`;
 
-                    // Create a copy of the current sale data
+                    // Prepare sale data
                     const completedSale = {
                         salesInvoiceId: salesInvoiceId,
                         customer: {
@@ -1985,26 +2157,133 @@
                             contact: customerContact
                         },
                         items: JSON.parse(JSON.stringify(cart)), // Deep copy cart items
-                        subtotal: parseFloat(subtotalEl.textContent.replace('₱', '')), // Use ₱ for parsing
+                        subtotal: currentSubtotal,
                         tax: 0, // Tax is now always 0
-                        total: parseFloat(totalEl.textContent.replace('₱', '')), // Use ₱ for parsing
-                        timestamp: new Date().toISOString() // Store timestamp for sorting and display
+                        total: currentTotal,
+                        couponApplied: appliedCoupon ? { ...appliedCoupon } : null, // Store applied coupon details
+                        discountAmount: currentDiscountAmount,
+                        timestamp: firebase.serverTimestamp() // Use server timestamp for consistency
                     };
 
-                    // Add the completed sale to Firestore
-                    // Use currentAppId for the Firestore path
-                    await firebase.addDoc(firebase.collection(db, `artifacts/${currentAppId}/public/data/salesLogs`), completedSale);
+                    // Firestore Transaction for atomicity
+                    await firebase.runTransaction(db, async (transaction) => {
+                        // 1. Update stock for each item in the cart
+                        for (const cartItem of cart) {
+                            const itemDocRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/inventory`, cartItem.id);
+                            const itemDocSnap = await transaction.get(itemDocRef);
 
-                    // Do NOT clear cart immediately. Display receipt first.
+                            if (!itemDocSnap.exists()) {
+                                throw new Error(`Product ${cartItem.name} not found in inventory during checkout.`);
+                            }
+
+                            const currentStock = itemDocSnap.data().stock;
+                            const newStock = currentStock - cartItem.quantity;
+
+                            if (newStock < 0) {
+                                throw new Error(`Insufficient stock for ${cartItem.name}. Available: ${currentStock}, Needed: ${cartItem.quantity}.`);
+                            }
+                            transaction.update(itemDocRef, { stock: newStock });
+                        }
+
+                        // 2. Increment coupon usage count if a coupon was applied
+                        if (appliedCoupon) {
+                            const couponDocRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/coupons`, appliedCoupon.id);
+                            const couponDocSnap = await transaction.get(couponDocRef);
+
+                            if (!couponDocSnap.exists()) {
+                                throw new Error(`Applied coupon ${appliedCoupon.code} not found.`);
+                            }
+
+                            const currentUsedCount = couponDocSnap.data().usedCount || 0;
+                            const newUsedCount = currentUsedCount + 1;
+
+                            transaction.update(couponDocRef, { usedCount: newUsedCount });
+                        }
+
+                        // 3. Add the completed sale to sales logs
+                        await transaction.set(firebase.doc(firebase.collection(db, `artifacts/${currentAppId}/public/data/salesLogs`), salesInvoiceId), completedSale);
+                    });
+
+                    showMessageBox('Sale Complete', `Sale finalized successfully! Invoice ID: ${salesInvoiceId}`);
                     closeSaleSummaryModal(); // Close the checkout summary modal
                     displayReceiptModal(completedSale); // Show the receipt in a modal
 
                 } catch (error) {
-                    console.error("Error finalizing sale or adding to logs:", error);
-                    showMessageBox('Error', 'Failed to finalize sale. Please try again.');
+                    console.error("Error finalizing sale:", error);
+                    showMessageBox('Error', `Failed to finalize sale: ${error.message || 'Please try again.'}`);
+                    // Important: If transaction failed, cart is NOT cleared to allow user to retry or adjust.
                 }
             }
         }
+
+        /**
+         * Voids a sale, updates its status, and returns stock to inventory.
+         * Only accessible by admin.
+         * @param {string} invoiceId - The salesInvoiceId of the sale to void.
+         */
+        async function voidSale(invoiceId) {
+            if (!isFirebaseReady || userRole !== 'admin') {
+                showMessageBox('Access Denied', 'You do not have permission to void sales.');
+                return;
+            }
+
+            const saleToVoid = salesLogs.find(log => log.salesInvoiceId === invoiceId);
+
+            if (!saleToVoid) {
+                showMessageBox('Error', 'Sales record not found.');
+                return;
+            }
+            if (saleToVoid.isVoided) {
+                showMessageBox('Already Voided', 'This sale has already been voided.');
+                return;
+            }
+
+            const confirmed = await showMessageBox(
+                'Confirm Void Sale',
+                `Are you sure you want to void sale ${invoiceId}? This will return items to inventory.`,
+                true
+            );
+
+            if (confirmed) {
+                try {
+                    await firebase.runTransaction(db, async (transaction) => {
+                        const saleDocRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/salesLogs`, invoiceId);
+                        const saleDocSnap = await transaction.get(saleDocRef);
+
+                        if (!saleDocSnap.exists() || saleDocSnap.data().isVoided) {
+                            throw new Error('Sale not found or already voided.');
+                        }
+
+                        const itemsToReturn = saleDocSnap.data().items;
+
+                        // Return stock for each item in the voided sale
+                        for (const soldItem of itemsToReturn) {
+                            const itemDocRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/inventory`, soldItem.id);
+                            const itemDocSnap = await transaction.get(itemDocRef);
+
+                            if (itemDocSnap.exists()) {
+                                const currentStock = itemDocSnap.data().stock;
+                                const newStock = currentStock + soldItem.quantity;
+                                transaction.update(itemDocRef, { stock: newStock });
+                            } else {
+                                console.warn(`Void operation: Product ${soldItem.name} (ID: ${soldItem.id}) not found in inventory. Stock not returned.`);
+                                // Don't throw an error, allow the void to proceed for the sale record itself
+                            }
+                        }
+
+                        // Mark the sale as voided
+                        transaction.update(saleDocRef, { isVoided: true, voidedAt: firebase.serverTimestamp() });
+                    });
+
+                    showMessageBox('Sale Voided', `Sale ${invoiceId} has been successfully voided and stock returned.`);
+                    // UI will update via onSnapshot listener
+                } catch (error) {
+                    console.error("Error voiding sale:", error);
+                    showMessageBox('Error', `Failed to void sale: ${error.message || 'Please try again.'}`);
+                }
+            }
+        }
+
 
         // --- Sales Report Functions ---
 
@@ -2019,10 +2298,13 @@
             const now = new Date();
             let periodText = '';
 
+            // Filter out voided sales for reporting totals and item summary
+            const nonVoidedSales = salesLogs.filter(log => !log.isVoided);
+
             if (currentReportFilter === 'daily') {
                 periodText = `Today (${now.toLocaleDateString()})`;
-                filteredSales = salesLogs.filter(log => {
-                    const logDate = new Date(log.timestamp);
+                filteredSales = nonVoidedSales.filter(log => {
+                    const logDate = new Date(log.timestamp.toDate ? log.timestamp.toDate() : log.timestamp); // Handle Firestore Timestamp objects
                     return logDate.toDateString() === now.toDateString();
                 });
             } else if (currentReportFilter === 'weekly') {
@@ -2037,8 +2319,8 @@
                 endOfWeek.setHours(23, 59, 59, 999);
 
                 periodText = `This Week (${startOfWeek.toLocaleDateString()} - ${endOfWeek.toLocaleDateString()})`;
-                filteredSales = salesLogs.filter(log => {
-                    const logDate = new Date(log.timestamp);
+                filteredSales = nonVoidedSales.filter(log => {
+                    const logDate = new Date(log.timestamp.toDate ? log.timestamp.toDate() : log.timestamp);
                     return logDate >= startOfWeek && logDate <= endOfWeek;
                 });
             } else if (currentReportFilter === 'monthly') {
@@ -2051,8 +2333,8 @@
                 endOfMonth.setHours(23, 59, 59, 999);
 
                 periodText = `This Month (${startOfMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })})`;
-                filteredSales = salesLogs.filter(log => {
-                    const logDate = new Date(log.timestamp);
+                filteredSales = nonVoidedSales.filter(log => {
+                    const logDate = new Date(log.timestamp.toDate ? log.timestamp.toDate() : log.timestamp);
                     return logDate >= startOfMonth && logDate <= endOfMonth;
                 });
             }
@@ -2106,19 +2388,25 @@
             } else {
                 // Add a header for individual sales logs if there are any
                 reportDetailsListEl.innerHTML = `<h4 class="text-xl font-semibold text-blue-300 mb-4">Individual Sales Logs:</h4>`;
-                filteredSales.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                filteredSales.sort((a, b) => new Date(b.timestamp.toDate ? b.timestamp.toDate() : b.timestamp) - new Date(a.timestamp.toDate ? a.timestamp.toDate() : a.timestamp));
 
                 filteredSales.forEach(log => {
+                    const logDate = new Date(log.timestamp.toDate ? log.timestamp.toDate() : log.timestamp).toLocaleDateString();
+                    const logTime = new Date(log.timestamp.toDate ? log.timestamp.toDate() : log.timestamp).toLocaleTimeString();
+                    const isVoided = log.isVoided ? true : false;
+                    const voidedClass = isVoided ? 'opacity-70 text-red-300' : '';
+
                     const logDiv = document.createElement('div');
                     logDiv.className = `
                         bg-gray-700 rounded-lg p-3 mb-3 shadow-sm border border-gray-600
-                        flex justify-between items-center text-sm
+                        flex justify-between items-center text-sm ${voidedClass}
                     `;
                     logDiv.innerHTML = `
                         <div>
-                            <p class="font-semibold text-white">${log.salesInvoiceId}</p>
-                            <p class="text-gray-300">${new Date(log.timestamp).toLocaleString()}</p>
+                            <p class="font-semibold text-white">${log.salesInvoiceId} ${isVoided ? '(VOIDED)' : ''}</p>
+                            <p class="text-gray-300">${logDate} ${logTime}</p>
                             <p class="text-gray-400">Customer: ${log.customer.name}</p>
+                            ${log.couponApplied ? `<p class="text-xs text-green-300">Coupon: ${log.couponApplied.code} (-${formatCurrency(log.discountAmount)})</p>` : ''}
                         </div>
                         <span class="text-lg font-bold text-blue-300">${formatCurrency(log.total)}</span>
                     `;
@@ -2194,10 +2482,280 @@
             }
         }
 
+        // --- Coupon Management Functions ---
+
+        /**
+         * Renders the list of existing coupons in the Coupon Management tab.
+         */
+        function renderCoupons() {
+            existingCouponsListEl.innerHTML = ''; // Clear existing list
+
+            if (coupons.length === 0) {
+                emptyCouponsMessageEl.classList.remove('hidden');
+                return;
+            } else {
+                emptyCouponsMessageEl.classList.add('hidden');
+            }
+
+            // Sort coupons by code
+            const sortedCoupons = [...coupons].sort((a, b) => a.code.localeCompare(b.code));
+
+            sortedCoupons.forEach(coupon => {
+                const now = new Date();
+                const validFromDate = new Date(coupon.validFrom);
+                const validUntilDate = new Date(coupon.validUntil);
+                let status = 'Active';
+                let statusColor = 'text-green-500';
+
+                if (!coupon.isActive) {
+                    status = 'Inactive';
+                    statusColor = 'text-gray-500';
+                } else if (now < validFromDate) {
+                    status = 'Upcoming';
+                    statusColor = 'text-blue-500';
+                } else if (now > validUntilDate) {
+                    status = 'Expired';
+                    statusColor = 'text-red-500';
+                } else if (coupon.usageLimit > 0 && coupon.usedCount >= coupon.usageLimit) {
+                    status = 'Usage Limit Reached';
+                    statusColor = 'text-yellow-500';
+                }
+
+                const couponDiv = document.createElement('div');
+                couponDiv.className = `
+                    bg-gray-700 rounded-lg p-4 mb-3 shadow-sm border border-gray-600
+                    flex flex-col sm:flex-row justify-between items-center transition-all duration-200
+                    hover:scale-[1.01] hover:bg-gray-600
+                `;
+                couponDiv.innerHTML = `
+                    <div class="flex-1 text-left mb-2 sm:mb-0">
+                        <h3 class="text-xl font-bold text-white">${coupon.code} <span class="text-sm ${statusColor}">(${status})</span></h3>
+                        <p class="text-gray-300">${coupon.type === 'fixed' ? formatCurrency(coupon.value) : coupon.value + '%'} Discount</p>
+                        <p class="text-gray-400 text-sm">Valid: ${validFromDate.toLocaleDateString()} - ${validUntilDate.toLocaleDateString()}</p>
+                        <p class="text-gray-400 text-sm">Usage: ${coupon.usedCount || 0} / ${coupon.usageLimit === 0 ? 'Unlimited' : coupon.usageLimit}</p>
+                    </div>
+                    ${userRole === 'admin' ? `
+                        <div class="flex space-x-2 mt-2 sm:mt-0">
+                            <button data-coupon-id="${coupon.id}" class="toggle-coupon-status-btn px-3 py-1 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 text-sm">
+                                ${coupon.isActive ? 'Deactivate' : 'Activate'}
+                            </button>
+                            <button data-coupon-id="${coupon.id}" class="delete-coupon-btn px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm">
+                                Delete
+                            </button>
+                        </div>
+                    ` : ''}
+                `;
+                existingCouponsListEl.appendChild(couponDiv);
+            });
+
+            // Add event listeners for new buttons
+            document.querySelectorAll('.toggle-coupon-status-btn').forEach(button => {
+                button.addEventListener('click', (event) => {
+                    const couponId = event.target.dataset.couponId;
+                    toggleCouponStatus(couponId);
+                });
+            });
+
+            document.querySelectorAll('.delete-coupon-btn').forEach(button => {
+                button.addEventListener('click', (event) => {
+                    const couponId = event.target.dataset.couponId;
+                    deleteCoupon(couponId);
+                });
+            });
+        }
+
+        /**
+         * Creates a new coupon and adds it to Firestore.
+         */
+        async function createCoupon() {
+            if (!isFirebaseReady || userRole !== 'admin') {
+                showMessageBox('Access Denied', 'You do not have permission to create coupons.');
+                return;
+            }
+
+            const code = newCouponCodeEl.value.trim().toUpperCase();
+            const type = newCouponTypeEl.value;
+            const value = parseFloat(newCouponValueEl.value);
+            const validFrom = newCouponValidFromEl.value; // YYYY-MM-DD string
+            const validUntil = newCouponValidUntilEl.value; // YYYY-MM-DD string
+            const usageLimit = parseInt(newCouponUsageLimitEl.value);
+
+            // Basic Validation
+            if (!code || !type || isNaN(value) || value <= 0 || !validFrom || !validUntil || isNaN(usageLimit) || usageLimit < 0) {
+                showMessageBox('Input Error', 'Please fill in all coupon fields with valid values.');
+                return;
+            }
+            if (type === 'percentage' && value > 100) {
+                showMessageBox('Input Error', 'Percentage discount cannot exceed 100%.');
+                return;
+            }
+            if (new Date(validFrom) > new Date(validUntil)) {
+                showMessageBox('Input Error', '"Valid From" date cannot be after "Valid Until" date.');
+                return;
+            }
+            if (coupons.some(c => c.code === code)) {
+                showMessageBox('Input Error', 'Coupon code already exists. Please choose a unique code.');
+                return;
+            }
+
+            const newCoupon = {
+                code: code,
+                type: type,
+                value: value,
+                validFrom: new Date(validFrom).toISOString(), // Store as ISO string
+                validUntil: new Date(validUntil).toISOString(), // Store as ISO string
+                usageLimit: usageLimit,
+                usedCount: 0,
+                isActive: true,
+                createdAt: firebase.serverTimestamp()
+            };
+
+            try {
+                // Add coupon to Firestore, letting Firestore auto-generate ID
+                const docRef = await firebase.addDoc(firebase.collection(db, `artifacts/${currentAppId}/public/data/coupons`), newCoupon);
+                showMessageBox('Success', `Coupon "${code}" created successfully!`);
+
+                // Clear form
+                newCouponCodeEl.value = '';
+                newCouponTypeEl.value = 'fixed';
+                newCouponValueEl.value = '';
+                newCouponValidFromEl.value = '';
+                newCouponValidUntilEl.value = '';
+                newCouponUsageLimitEl.value = '0';
+                // Listener will re-render existing coupons
+            } catch (error) {
+                console.error("Error creating coupon:", error);
+                showMessageBox('Error', `Failed to create coupon: ${error.message || 'Please try again.'}`);
+            }
+        }
+
+        /**
+         * Toggles the active status of a coupon in Firestore.
+         * @param {string} couponId - The ID of the coupon document.
+         */
+        async function toggleCouponStatus(couponId) {
+            if (!isFirebaseReady || userRole !== 'admin') {
+                showMessageBox('Access Denied', 'You do not have permission to change coupon status.');
+                return;
+            }
+            const couponToToggle = coupons.find(c => c.id === couponId);
+            if (!couponToToggle) {
+                showMessageBox('Error', 'Coupon not found.');
+                return;
+            }
+
+            const newStatus = !couponToToggle.isActive;
+            const confirmed = await showMessageBox(
+                'Confirm Status Change',
+                `Are you sure you want to ${newStatus ? 'activate' : 'deactivate'} coupon "${couponToToggle.code}"?`,
+                true
+            );
+
+            if (confirmed) {
+                try {
+                    const couponDocRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/coupons`, couponId);
+                    await firebase.updateDoc(couponDocRef, { isActive: newStatus });
+                    showMessageBox('Success', `Coupon "${couponToToggle.code}" is now ${newStatus ? 'active' : 'inactive'}.`);
+                    // Listener will re-render
+                } catch (error) {
+                    console.error("Error toggling coupon status:", error);
+                    showMessageBox('Error', `Failed to change coupon status: ${error.message || 'Please try again.'}`);
+                }
+            }
+        }
+
+        /**
+         * Deletes a coupon from Firestore.
+         * @param {string} couponId - The ID of the coupon document.
+         */
+        async function deleteCoupon(couponId) {
+            if (!isFirebaseReady || userRole !== 'admin') {
+                showMessageBox('Access Denied', 'You do not have permission to delete coupons.');
+                return;
+            }
+            const couponToDelete = coupons.find(c => c.id === couponId);
+            const confirmed = await showMessageBox(
+                'Confirm Deletion',
+                `Are you sure you want to delete coupon "${couponToDelete ? couponToDelete.code : 'this coupon'}"? This action cannot be undone.`,
+                true
+            );
+
+            if (confirmed) {
+                try {
+                    const couponDocRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/coupons`, couponId);
+                    await firebase.deleteDoc(couponDocRef);
+                    showMessageBox('Success', 'Coupon deleted successfully.');
+                    // Listener will re-render
+                } catch (error) {
+                    console.error("Error deleting coupon:", error);
+                    showMessageBox('Error', `Failed to delete coupon: ${error.message || 'Please try again.'}`);
+                }
+            }
+        }
+
+        /**
+         * Applies a coupon code to the current cart.
+         */
+        function applyCoupon() {
+            const code = couponCodeInputEl.value.trim().toUpperCase();
+            couponStatusMessageEl.textContent = ''; // Clear previous messages
+            appliedDiscountDisplayRowEl.classList.add('hidden'); // Hide discount until applied
+
+            if (!code) {
+                appliedCoupon = null;
+                calculateTotals();
+                couponStatusMessageEl.textContent = 'Coupon cleared.';
+                return;
+            }
+
+            const now = new Date();
+            const foundCoupon = coupons.find(c => c.code === code);
+
+            if (!foundCoupon) {
+                appliedCoupon = null;
+                couponStatusMessageEl.textContent = 'Invalid coupon code.';
+                calculateTotals();
+                return;
+            }
+
+            const validFromDate = new Date(foundCoupon.validFrom);
+            const validUntilDate = new Date(foundCoupon.validUntil);
+
+            if (!foundCoupon.isActive) {
+                appliedCoupon = null;
+                couponStatusMessageEl.textContent = 'Coupon is inactive.';
+                calculateTotals();
+                return;
+            }
+            if (now < validFromDate) {
+                appliedCoupon = null;
+                couponStatusMessageEl.textContent = `Coupon not yet active. Valid from ${validFromDate.toLocaleDateString()}.`;
+                calculateTotals();
+                return;
+            }
+            if (now > validUntilDate) {
+                appliedCoupon = null;
+                couponStatusMessageEl.textContent = 'Coupon has expired.';
+                calculateTotals();
+                return;
+            }
+            if (foundCoupon.usageLimit > 0 && foundCoupon.usedCount >= foundCoupon.usageLimit) {
+                appliedCoupon = null;
+                couponStatusMessageEl.textContent = 'Coupon usage limit reached.';
+                calculateTotals();
+                return;
+            }
+
+            appliedCoupon = foundCoupon;
+            couponStatusMessageEl.textContent = `Coupon "${foundCoupon.code}" applied!`;
+            appliedDiscountDisplayRowEl.classList.remove('hidden'); // Show discount row
+            calculateTotals();
+        }
 
         // --- Firestore Listeners ---
         let inventoryUnsubscribe;
         let salesLogsUnsubscribe;
+        let couponsUnsubscribe;
 
         // Function to set up Firestore listeners (called after Firebase is ready)
         function setupFirestoreListeners() {
@@ -2210,6 +2768,9 @@
             const inventoryCollectionRef = firebase.collection(db, `artifacts/${currentAppId}/public/data/inventory`);
             // Reference to the public sales logs collection
             const salesLogsCollectionRef = firebase.collection(db, `artifacts/${currentAppId}/public/data/salesLogs`);
+            // Reference to the public coupons collection
+            const couponsCollectionRef = firebase.collection(db, `artifacts/${currentAppId}/public/data/coupons`);
+
 
             // Inventory Listener
             inventoryLoadingEl.classList.remove('hidden');
@@ -2287,7 +2848,51 @@
                 }
                 salesLogLoadingEl.classList.add('hidden');
             });
+
+            // Coupons Listener
+            couponsUnsubscribe = firebase.onSnapshot(couponsCollectionRef, (snapshot) => {
+                const fetchedCoupons = [];
+                snapshot.forEach(doc => {
+                    fetchedCoupons.push({ id: doc.id, ...doc.data() });
+                });
+                coupons = fetchedCoupons; // Update global coupons array
+                renderCoupons(); // Render the coupon list
+                // If the currently applied coupon is no longer valid, clear it
+                if (appliedCoupon) {
+                    const updatedAppliedCoupon = coupons.find(c => c.id === appliedCoupon.id);
+                    if (!updatedAppliedCoupon || !isValidCoupon(updatedAppliedCoupon, true)) { // Pass true to also check usage limit
+                        appliedCoupon = null;
+                        couponCodeInputEl.value = '';
+                        couponStatusMessageEl.textContent = 'Applied coupon is no longer valid.';
+                        calculateTotals(); // Recalculate if coupon became invalid
+                    } else {
+                        // If still valid, update the appliedCoupon object in case its state changed
+                        appliedCoupon = updatedAppliedCoupon;
+                        calculateTotals(); // Recalculate to ensure discount is correct with any changes
+                    }
+                }
+            }, (error) => {
+                console.error("Error listening to coupons:", error);
+                if (auth.currentUser && userRole === 'admin') {
+                    showMessageBox('Data Error', 'Failed to load coupon data. Please check your connection and security rules.');
+                }
+            });
         }
+
+        // Helper function for coupon validation (can be reused)
+        function isValidCoupon(coupon, checkUsageLimit = false) {
+            const now = new Date();
+            const validFromDate = new Date(coupon.validFrom);
+            const validUntilDate = new Date(coupon.validUntil);
+
+            if (!coupon.isActive) return false;
+            if (now < validFromDate) return false;
+            if (now > validUntilDate) return false;
+            if (checkUsageLimit && coupon.usageLimit > 0 && coupon.usedCount >= coupon.usageLimit) return false;
+
+            return true;
+        }
+
 
         // --- Authentication and Authorization Functions ---
 
@@ -2434,7 +3039,7 @@
                 await firebase.setDoc(firebase.doc(db, `artifacts/${currentAppId}/public/data/users`, newUid), {
                     email: email,
                     role: role,
-                    createdAt: firebase.serverTimestamp ? firebase.serverTimestamp() : new Date().toISOString() // Fallback for testing outside Canvas
+                    createdAt: firebase.serverTimestamp()
                 });
 
                 showMessageBox('User Added', `User "${email}" added successfully with role "${role}".`);
@@ -2486,6 +3091,7 @@
             tabInventoryMasterBtn = document.getElementById('tab-inventory-master');
             tabReportLogsBtn = document.getElementById('tab-report-logs');
             tabSalesReportBtn = document.getElementById('tab-sales-report');
+            tabCouponManagementBtn = document.getElementById('tab-coupon-management'); // Get coupon tab button
             tabUserManagementBtn = document.getElementById('tab-user-management'); // User Management tab
 
             inventoryContentEl = document.getElementById('inventory-content');
@@ -2548,11 +3154,14 @@
             summaryTotalEl = document.getElementById('summary-total');
             saleSummaryCancelBtn = document.getElementById('sale-summary-cancel-btn');
             saleSummaryCheckoutBtn = document.getElementById('sale-summary-checkout-btn');
+            summaryAppliedDiscountEl = document.getElementById('summary-applied-discount'); // Get summary discount
 
             receiptModalContainer = document.getElementById('receipt-modal-container');
             receiptModalContentTemplate = document.getElementById('receipt-modal-content');
             // activeReceiptPrintBtn and activeReceiptNewSaleBtn are assigned dynamically
             receiptCloseBtn = document.getElementById('receipt-close-btn');
+            receiptDiscountEl = document.getElementById('receipt-discount'); // Get receipt discount
+            receiptDiscountRowEl = document.getElementById('receipt-discount-row'); // Get receipt discount row
 
             salesReportContentEl = document.getElementById('sales-report-content');
             filterDailyBtn = document.getElementById('filter-daily');
@@ -2579,6 +3188,25 @@
             newUserPasswordEl = document.getElementById('new-user-password');
             newUserRoleEl = document.getElementById('new-user-role');
             addNewUserBtnEl = document.getElementById('add-new-user-btn');
+
+            // New coupon application elements
+            couponCodeInputEl = document.getElementById('coupon-code-input');
+            applyCouponBtn = document.getElementById('apply-coupon-btn');
+            couponStatusMessageEl = document.getElementById('coupon-status-message');
+            appliedDiscountEl = document.getElementById('applied-discount');
+            appliedDiscountDisplayRowEl = document.getElementById('applied-discount-display-row'); // The div for discount row
+
+            // New coupon creation elements
+            couponManagementContentEl = document.getElementById('coupon-management-content');
+            newCouponCodeEl = document.getElementById('new-coupon-code');
+            newCouponTypeEl = document.getElementById('new-coupon-type');
+            newCouponValueEl = document.getElementById('new-coupon-value');
+            newCouponValidFromEl = document.getElementById('new-coupon-valid-from');
+            newCouponValidUntilEl = document.getElementById('new-coupon-valid-until');
+            newCouponUsageLimitEl = document.getElementById('new-coupon-usage-limit');
+            createNewCouponBtn = document.getElementById('create-new-coupon-btn');
+            existingCouponsListEl = document.getElementById('existing-coupons-list');
+            emptyCouponsMessageEl = document.getElementById('empty-coupons-message');
 
 
             // Set FIREBASE_CONFIG - IMPORTANT: Use your actual Firebase config here for external deployment
@@ -2630,7 +3258,7 @@
                                 await firebase.setDoc(userDocRef, {
                                     email: user.email,
                                     role: userRole,
-                                    createdAt: new Date().toISOString()
+                                    createdAt: firebase.serverTimestamp()
                                 }, { merge: true }); // Merge to avoid overwriting if partial data exists
                             }
                         } catch (firestoreError) {
@@ -2660,14 +3288,20 @@
                         // Unsubscribe from Firestore listeners if user logs out
                         if (inventoryUnsubscribe) inventoryUnsubscribe();
                         if (salesLogsUnsubscribe) salesLogsUnsubscribe();
+                        if (couponsUnsubscribe) couponsUnsubscribe(); // Unsubscribe coupons too
                         // Clear data when logged out
                         inventory = [];
                         cart = [];
                         salesLogs = [];
+                        coupons = []; // Clear coupons
+                        appliedCoupon = null; // Clear applied coupon
+                        couponCodeInputEl.value = ''; // Clear coupon input
+                        couponStatusMessageEl.textContent = ''; // Clear coupon message
                         renderInventory();
                         renderCart();
                         renderReportLogs();
                         renderSalesReport();
+                        renderCoupons(); // Re-render coupons (will show empty message)
                     }
                 });
             } catch (error) {
@@ -2693,6 +3327,7 @@
             tabInventoryMasterBtn.addEventListener('click', () => switchMainTab('inventory-master'));
             tabReportLogsBtn.addEventListener('click', () => switchMainTab('report-logs'));
             tabSalesReportBtn.addEventListener('click', () => switchMainTab('sales-report')); // New sales report tab listener
+            tabCouponManagementBtn.addEventListener('click', () => switchMainTab('coupon-management')); // New coupon management tab listener
             tabUserManagementBtn.addEventListener('click', () => switchMainTab('user-management')); // User Management tab listener
 
             // Login/Logout button listener
@@ -2757,6 +3392,21 @@
             saleSummaryCancelBtn.addEventListener('click', closeSaleSummaryModal);
             saleSummaryCheckoutBtn.addEventListener('click', finalizeSale);
 
+            // Coupon application listeners
+            applyCouponBtn.addEventListener('click', applyCoupon);
+            couponCodeInputEl.addEventListener('input', () => {
+                // Clear status message as user types
+                couponStatusMessageEl.textContent = '';
+                appliedDiscountDisplayRowEl.classList.add('hidden');
+            });
+            // Also trigger applyCoupon if user hits Enter in the coupon input
+            couponCodeInputEl.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    event.preventDefault(); // Prevent form submission
+                    applyCoupon();
+                }
+            });
+
             // Sales Report Filter Buttons
             filterDailyBtn.addEventListener('click', () => {
                 currentReportFilter = 'daily';
@@ -2777,6 +3427,9 @@
                 renderSalesReport();
             });
             downloadReportPdfBtn.addEventListener('click', generatePdfReport);
+
+            // Coupon Management listeners
+            createNewCouponBtn.addEventListener('click', createCoupon);
 
             // User Management Listener
             addNewUserBtnEl.addEventListener('click', addNewUser);
