@@ -3309,6 +3309,7 @@
                                     createdAt: firebase.serverTimestamp()
                                 }, { merge: true }); // Merge to avoid overwriting if partial data exists
                             }
+                            console.log(`User ${user.email} (UID: ${user.uid}) logged in with role: ${userRole}`); // Added for debugging
                         } catch (firestoreError) {
                             console.error("Error fetching user role from Firestore:", firestoreError);
                             showMessageBox('Profile Error', 'Could not load user profile. Some features may be restricted.');
@@ -3327,6 +3328,7 @@
                         userId = 'Not Logged In';
                         userRole = 'guest'; // Reset role to guest
                         userIdDisplayEl.textContent = `User ID: ${userId}`;
+                        console.log('User logged out. Role reset to guest.'); // Added for debugging
 
                         // Hide main app content and show login modal
                         appContentWrapperEl.classList.add('hidden');
