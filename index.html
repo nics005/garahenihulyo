@@ -457,12 +457,12 @@
                     <!-- Coupon application section -->
                     <div class="mb-4 p-3 bg-gray-700 rounded-lg border border-gray-600">
                         <label for="coupon-code-input" class="block text-gray-300 text-sm font-bold mb-2">Apply Coupon:</label>
-                        <div class="flex space-x-2">
+                        <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
                             <input type="text" id="coupon-code-input" placeholder="Enter code"
                                    class="flex-grow p-2 rounded-md bg-gray-800 border border-gray-700 text-gray-200 placeholder-gray-500
                                           focus:outline-none focus:ring-1 focus:ring-blue-500">
                             <button id="apply-coupon-btn"
-                                    class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 active:bg-blue-700 transition duration-200">
+                                    class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 active:bg-blue-700 transition duration-200 w-full sm:w-auto">
                                 Apply
                             </button>
                         </div>
@@ -877,13 +877,22 @@
         // --- Render Functions ---
 
         /**
-         * Renders the inventory list in the left panel.
+         * Renders the inventory list in the left panel, adjusting stock for items in cart.
          * @param {Array<Object>} items - The list of inventory items to display.
          */
         function renderInventory(items = inventory) {
             inventoryListEl.innerHTML = ''; // Clear existing items
 
-            if (items.length === 0) {
+            // Calculate 'displayable' stock by subtracting items already in cart
+            const displayableItems = items.map(item => {
+                const cartItem = cart.find(cItem => cItem.id === item.id);
+                const quantityInCart = cartItem ? cartItem.quantity : 0;
+                const displayStock = Math.max(0, item.stock - quantityInCart); // Ensure non-negative
+                return { ...item, displayStock: displayStock };
+            });
+
+
+            if (displayableItems.length === 0) {
                 emptyInventoryMessageEl.classList.remove('hidden'); // Show empty message
                 return;
             } else {
@@ -891,7 +900,7 @@
             }
 
             // Sort items alphabetically by name
-            const sortedItems = [...items].sort((a, b) => a.name.localeCompare(b.name));
+            const sortedItems = [...displayableItems].sort((a, b) => a.name.localeCompare(b.name));
 
             sortedItems.forEach(item => {
                 const itemDiv = document.createElement('div');
@@ -900,6 +909,7 @@
                     flex items-center justify-between transition-all duration-200
                     hover:scale-[1.01] hover:bg-gray-700
                 `;
+                // Use item.displayStock for rendering
                 itemDiv.innerHTML = `
                     <div class="flex items-center space-x-3">
                         <img src="${item.imageUrl || 'https://placehold.co/48x48/555555/EEEEEE?text=Img'}"
@@ -907,7 +917,7 @@
                              alt="${item.name}" class="w-12 h-12 rounded-full object-cover border border-gray-600">
                         <div>
                             <h3 class="text-lg font-semibold text-blue-300">${item.name}</h3>
-                            <p class="text-sm text-gray-400">Stock: <span class="font-medium text-gray-200">${item.stock}</span></p>
+                            <p class="text-sm text-gray-400">Stock: <span class="font-medium text-gray-200">${item.displayStock}</span></p>
                         </div>
                     </div>
                     <div class="flex items-center space-x-3">
@@ -915,8 +925,8 @@
                         <button data-item-id="${item.id}"
                                 class="add-to-cart-btn px-3 py-1 bg-blue-600 text-white rounded-lg
                                        hover:bg-blue-700 active:bg-blue-800 transition duration-200
-                                       shadow-md text-sm ${item.stock === 0 ? 'opacity-50 cursor-not-allowed' : ''}"
-                                ${item.stock === 0 ? 'disabled' : ''}>
+                                       shadow-md text-sm ${item.displayStock === 0 ? 'opacity-50 cursor-not-allowed' : ''}"
+                                ${item.displayStock === 0 ? 'disabled' : ''}>
                             Add
                         </button>
                     </div>
@@ -948,13 +958,10 @@
                 couponStatusMessageEl.textContent = '';
                 appliedDiscountDisplayRowEl.classList.add('hidden'); // Hide discount row
                 calculateTotals(); // Ensure totals are zeroed out
+                renderInventory(); // Re-render inventory to update displayable stock
                 return;
             } else {
-                emptyCartMessageEl.classList.remove('hidden'); // Keep this line as 'empty-cart-message' is the default placeholder for when the cart is empty
-                // Hide empty-cart-message if there are items, but only if it's currently visible
-                if (!emptyCartMessageEl.classList.contains('hidden')) {
-                    emptyCartMessageEl.classList.add('hidden');
-                }
+                emptyCartMessageEl.classList.add('hidden'); // Hide empty message if items exist
                 checkoutButtonEl.disabled = false;
                 checkoutButtonEl.classList.remove('opacity-50', 'cursor-not-allowed');
                 // Show discount row only if a coupon is applied
@@ -1013,6 +1020,7 @@
             });
 
             calculateTotals();
+            renderInventory(); // Re-render inventory to reflect changes in available stock
         }
 
         /**
@@ -1328,7 +1336,7 @@
 
         /**
          * Adds an item to the cart or increments its quantity if already present.
-         * Also updates inventory stock.
+         * Stock deduction is now only on finalizeSale.
          * @param {string} itemId - The ID of the item to add.
          */
         async function addItemToCart(itemId) {
@@ -1337,33 +1345,26 @@
                 return;
             }
             try {
-                // Use currentAppId for the Firestore path
-                const itemDocRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/inventory`, itemId);
-                const itemDocSnap = await firebase.getDoc(itemDocRef);
+                // Get the current true stock from the global inventory
+                const inventoryItem = inventory.find(item => item.id === itemId);
 
-                if (!itemDocSnap.exists()) {
+                if (!inventoryItem) {
                     showMessageBox('Error', 'Item not found in inventory.');
                     return;
                 }
 
-                const inventoryItem = { id: itemDocSnap.id, ...itemDocSnap.data() };
+                const cartItem = cart.find(item => item.id === itemId);
+                let currentQuantityInCart = cartItem ? cartItem.quantity : 0;
+                let availableStockForCart = inventoryItem.stock - currentQuantityInCart;
 
-                if (inventoryItem.stock <= 0) {
-                    showMessageBox('Out of Stock', 'This item is currently out of stock.');
+                if (availableStockForCart <= 0) {
+                    showMessageBox('Out of Stock', 'This item is currently out of stock or all available units are already in your cart.');
                     return;
                 }
 
-                const cartItem = cart.find(item => item.id === itemId);
-
                 if (cartItem) {
                     // If item is already in cart, increment quantity
-                    if (inventoryItem.stock > 0) { // Check inventory stock again
-                        cartItem.quantity++;
-                        inventoryItem.stock--; // Update local inventory item for immediate visual update
-                        await firebase.updateDoc(itemDocRef, { stock: inventoryItem.stock });
-                    } else {
-                        showMessageBox('Stock Limit Reached', `You have added all available ${inventoryItem.name} items to your cart.`);
-                    }
+                    cartItem.quantity++;
                 } else {
                     cart.push({
                         id: inventoryItem.id,
@@ -1372,10 +1373,8 @@
                         quantity: 1,
                         imageUrl: inventoryItem.imageUrl
                     });
-                    inventoryItem.stock--; // Update local inventory item
-                    await firebase.updateDoc(itemDocRef, { stock: inventoryItem.stock });
                 }
-                renderCart(); // Cart rendering depends on the local `cart` array
+                renderCart(); // Re-render cart and then inventory (via renderCart)
             } catch (error) {
                 console.error("Error adding item to cart:", error);
                 showMessageBox('Error', 'Failed to add item to cart. Please try again.');
@@ -1383,8 +1382,8 @@
         }
 
         /**
-         * Sets the quantity of an item in the cart and updates Firestore.
-         * Handles validation for min (1) and max (available stock + current cart quantity).
+         * Sets the quantity of an item in the cart.
+         * Stock deduction is now only on finalizeSale.
          * @param {string} itemId - The ID of the item.
          * @param {number} newQuantity - The desired new quantity for the item.
          */
@@ -1398,62 +1397,34 @@
                 const cartItem = cart.find(item => item.id === itemId);
                 if (!cartItem) return;
 
-                const originalCartQuantity = cartItem.quantity;
-
-                // Fetch the current inventory stock from Firestore to ensure accuracy
-                const itemDocRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/inventory`, itemId);
-                const itemDocSnap = await firebase.getDoc(itemDocRef);
-                if (!itemDocSnap.exists()) {
+                const inventoryItem = inventory.find(item => item.id === itemId);
+                if (!inventoryItem) {
                     showMessageBox('Error', 'Item not found in inventory for quantity update.');
-                    renderCart(); // Re-render to correct UI if source disappeared
+                    renderCart();
                     return;
                 }
-                const inventoryItem = { id: itemDocSnap.id, ...itemDocSnap.data() };
-                const currentInventoryStock = inventoryItem.stock;
 
-                // Basic validation for the new quantity input
                 let quantityToSet = parseInt(newQuantity);
-                if (isNaN(quantityToSet) || quantityToSet < 1) {
-                    quantityToSet = 1; // Minimum quantity is 1
+                if (isNaN(quantityToSet) || quantityToSet < 0) { // Allow 0 to enable removal
+                    quantityToSet = 0;
                 }
 
-                // Calculate the maximum allowable quantity in the cart:
-                // This is the current stock in inventory PLUS what was already in the cart.
-                const maxAvailableForCart = currentInventoryStock + originalCartQuantity;
-
-                if (quantityToSet > maxAvailableForCart) {
-                    quantityToSet = maxAvailableForCart; // Don't allow buying more than total available stock
-                    showMessageBox('Stock Limit Reached', `You have added all available ${inventoryItem.name} items to your cart.`);
+                // Calculate the max allowed quantity based on actual inventory stock
+                // This is the total original stock from inventory, clamped by newQuantity
+                const maxAllowed = inventoryItem.stock;
+                if (quantityToSet > maxAllowed) {
+                    quantityToSet = maxAllowed;
+                    showMessageBox('Stock Limit Reached', `You can only add up to ${maxAllowed} of ${inventoryItem.name} to your cart.`);
                 }
 
-                // If the quantity hasn't actually changed after validation, do nothing
-                if (quantityToSet === originalCartQuantity) {
-                    renderCart(); // Still render to ensure UI reflects potential clamping
-                    return;
-                }
-
-                // Calculate the difference in stock based on the change in cart quantity
-                // Positive 'stockChange' means inventory stock increases (cart quantity decreased)
-                // Negative 'stockChange' means inventory stock decreases (cart quantity increased)
-                const stockChange = originalCartQuantity - quantityToSet;
-
-                // Update Firestore stock
-                const updatedInventoryStock = currentInventoryStock + stockChange;
-                await firebase.updateDoc(itemDocRef, { stock: updatedInventoryStock });
-
-                // Update local cart quantity or remove if quantity is 0
                 if (quantityToSet === 0) {
-                    // This case should ideally be handled by 'removeItemFromCart'
-                    // but if somehow set to 0, ensure it's removed.
+                    // If new quantity is 0, remove from cart
                     cart.splice(cart.findIndex(item => item.id === itemId), 1);
                 } else {
                     cartItem.quantity = quantityToSet;
                 }
 
-                // Re-render both cart and inventory to reflect changes
-                renderCart();
-                // No direct call to renderInventory needed, as its data is updated via onSnapshot.
-
+                renderCart(); // Re-render cart and then inventory (via renderCart)
             } catch (error) {
                 console.error("Error setting cart quantity:", error);
                 showMessageBox('Error', 'Failed to update item quantity. Please try again.');
@@ -1462,7 +1433,8 @@
         }
 
         /**
-         * Removes an item completely from the cart and returns stock to inventory in Firestore.
+         * Removes an item completely from the cart.
+         * Stock is returned to 'available' for display, but not to Firestore until sale is voided.
          * @param {string} itemId - The ID of the item to remove.
          */
         async function removeItemFromCart(itemId) {
@@ -1473,18 +1445,9 @@
             try {
                 const itemIndex = cart.findIndex(item => item.id === itemId);
                 if (itemIndex > -1) {
-                    const removedItem = cart[itemIndex];
-                    // Use currentAppId for the Firestore path
-                    const itemDocRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/inventory`, itemId);
-                    const itemDocSnap = await firebase.getDoc(itemDocRef);
-                    if (itemDocSnap.exists()) {
-                        const inventoryItem = { id: itemDocSnap.id, ...itemDocSnap.data() };
-                        const newStock = inventoryItem.stock + removedItem.quantity;
-                        await firebase.updateDoc(itemDocRef, { stock: newStock });
-                    }
                     cart.splice(itemIndex, 1); // Remove item from local cart array
                 }
-                renderCart();
+                renderCart(); // Re-render cart and then inventory (via renderCart)
             }
             catch (error) {
                 console.error("Error removing item from cart:", error);
@@ -2190,7 +2153,7 @@
                         }
 
                         // --- PHASE 2: PERFORM ALL WRITE OPERATIONS ---
-                        // 1. Update stock for each item in the cart
+                        // 1. Update stock for each item in the cart (Deduction now happens ONLY here)
                         for (const cartItem of cart) {
                             const currentStock = itemSnaps[cartItem.id].data().stock;
                             const newStock = currentStock - cartItem.quantity;
