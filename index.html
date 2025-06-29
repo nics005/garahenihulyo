@@ -216,12 +216,12 @@
             <!-- Top Header Panel -->
             <header id="main-header">
                 <div class="flex items-center space-x-4">
-                    <!-- Custom logo based on user request -->
+                    <!-- Custom logo added based on user request -->
                     <img src="https://scontent.fmnl17-2.fna.fbcdn.net/v/t39.30808-6/432725210_122115657752230587_8420052317826264936_n.jpg?_nc_cat=107&ccb=1-7&_nc_sid=6ee11a&_nc_eui2=AeFQuix_sgAinwvqEloWRmRrKmfC3maObI8qZ8LeZo5sj8vAQqr_JC9Fpw20JNKdwyGEmKxHmeCS13eK7cNozFC4&_nc_ohc=yXMR9-p-LkAQ7kNvwEGM_iE&_nc_oc=AdkR9Ic0Mv9IkLgZKC9xU5_Me3UPAFxAPa3C_vdUioSCL4JuWwbXHRxqo946zUguqM&_nc_zt=23&_nc_ht=scontent.fmnl17-2.fna&_nc_gid=BW0dXenNjVSN0gfgFBLyNg&oh=00_AfNVOOLzzAt2XcEsqDJf0PXbRUm3bxfLEljZ6djGhEP5uw&oe=68620775" alt="Garahe ni Hulyo Logo" class="rounded-full w-12 h-12 object-cover">
                     <h1 class="text-3xl font-extrabold text-white">Garahe ni Hulyo POS System</h1>
                 </div>
-                <!-- User ID Display - Moved to header for visibility -->
-                <div class="text-sm text-gray-400 mt-2 md:mt-0">
+                <!-- User ID Display - Hidden as per user request -->
+                <div class="text-sm text-gray-400 mt-2 md:mt-0 hidden">
                     <span id="user-id-display">Not Logged In</span>
                 </div>
             </header>
@@ -436,6 +436,19 @@
                                        focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-gray-800">
                             Add User
                         </button>
+                    </div>
+
+                    <!-- Existing Users Table -->
+                    <div class="p-6 bg-gray-800 rounded-lg shadow-md border border-gray-700 flex-1 overflow-y-auto">
+                        <h3 class="text-xl font-bold text-white mb-4">Existing Users</h3>
+                        <div id="user-list-loading" class="flex justify-center items-center h-24 hidden">
+                            <div class="spinner"></div>
+                            <p class="ml-3 text-gray-400">Loading Users...</p>
+                        </div>
+                        <div id="user-list">
+                            <p class="text-gray-400 text-center py-8" id="empty-users-message">No users created yet.</p>
+                            <!-- Users will be rendered here by JavaScript -->
+                        </div>
                     </div>
                 </div>
 
@@ -800,6 +813,36 @@
         </div>
     </div>
 
+    <!-- Edit User Role Modal -->
+    <div id="edit-user-role-modal-container" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50">
+        <div class="bg-gray-800 p-6 rounded-lg shadow-xl border border-gray-700 w-96">
+            <div class="flex justify-between items-center border-b border-gray-700 pb-4 mb-4">
+                <h2 class="text-xl font-bold text-white">Edit User Role</h2>
+                <button id="edit-user-role-modal-close-btn"
+                        class="text-gray-400 hover:text-white text-3xl leading-none font-semibold">
+                    &times;
+                </button>
+            </div>
+            <div class="mb-4">
+                <p class="text-gray-300 mb-2">Editing user: <span id="edit-user-email-display" class="font-semibold text-white"></span></p>
+            </div>
+            <div class="mb-6">
+                <label for="edit-user-role-select" class="block text-gray-300 text-sm font-bold mb-2">New Role:</label>
+                <select id="edit-user-role-select"
+                        class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-600">
+                    <option value="user">User</option>
+                    <option value="admin">Administrator</option>
+                </select>
+            </div>
+            <button id="save-user-role-btn"
+                    class="w-full py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold
+                           rounded-lg shadow-lg transform transition duration-200 hover:scale-105
+                           focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800">
+                Save Role
+            </button>
+        </div>
+    </div>
+
 
     <script>
         // Global Firebase objects (will be populated by the module script)
@@ -813,6 +856,7 @@
         let cart = []; // Still in-memory for current transaction
         let salesLogs = []; // Fetched from Firestore
         let coupons = [];   // New: Fetched from Firestore for coupon management
+        let users = []; // New: Fetched from Firestore for user management
 
         const TAX_RATE = 0; // Changed to 0 as per request
         let productCounter = 1; // Will be determined by existing Firestore product IDs
@@ -843,6 +887,11 @@
         let existingCouponsListEl, emptyCouponsMessageEl; // Existing coupons display
         let emptyInventoryMessageEl; // New: Empty inventory message element
         let categoryFilterEl; // New: Category filter dropdown element
+
+        // New DOM elements for User Management Table and Modal
+        let userListEl, emptyUsersMessageEl, userListLoadingEl;
+        let editUserRoleModalContainer, editUserRoleModalCloseBtn, editUserEmailDisplayEl, editUserRoleSelectEl, saveUserRoleBtn;
+
 
         // --- Helper Functions ---
 
@@ -1578,6 +1627,20 @@
         // --- Management Functions (used within modal) ---
 
         /**
+         * Normalizes a category string to ensure correct spelling for common terms like "Accessories".
+         * @param {string} category The category string to normalize.
+         * @returns {string} The normalized category string.
+         */
+        function normalizeCategory(category) {
+            const lowerCaseCategory = category.toLowerCase();
+            if (lowerCaseCategory === 'accesories' || lowerCaseCategory === 'acessories') {
+                return 'Accessories';
+            }
+            // You can add more normalization rules here if needed
+            return category;
+        }
+
+        /**
          * Handles adding a new product to the inventory in Firestore.
          */
         async function addNewProduct() {
@@ -1586,7 +1649,7 @@
                 return;
             }
             const name = modalNewProductNameEl.value.trim();
-            const category = modalNewProductCategoryEl.value.trim(); // Get category
+            const category = normalizeCategory(modalNewProductCategoryEl.value.trim()); // Normalize category
             const price = parseFloat(modalNewProductPriceEl.value);
             const stock = parseInt(modalNewProductStockEl.value);
             const restockLevel = parseInt(modalNewProductRestockLevelEl.value);
@@ -1618,7 +1681,7 @@
             const newProductId = 'item-' + String(productCounter++).padStart(3, '0');
             const newProductData = {
                 name: name,
-                category: category, // Save category
+                category: category, // Save normalized category
                 price: price,
                 stock: stock,
                 restockLevel: restockLevel,
@@ -1762,7 +1825,7 @@
             }
 
             const name = editProductNameEl.value.trim();
-            const category = editProductCategoryEl.value.trim(); // Get category
+            const category = normalizeCategory(editProductCategoryEl.value.trim()); // Normalize category
             const price = parseFloat(editProductPriceEl.value);
             const stock = parseInt(editProductStockEl.value);
             const restockLevel = parseInt(editProductRestockLevelEl.value);
@@ -1791,7 +1854,7 @@
 
             const updatedProductData = {
                 name: name,
-                category: category, // Save category
+                category: category, // Save normalized category
                 price: price,
                 stock: stock,
                 restockLevel: restockLevel,
@@ -1919,6 +1982,7 @@
                 if (userRole === 'admin') {
                     userManagementContentEl.classList.remove('hidden');
                     tabUserManagementBtn.classList.add('active');
+                    renderUsers(); // Render users when this tab is opened
                 } else {
                     showMessageBox('Access Denied', 'You do not have permission to manage users.');
                     switchMainTab('inventory');
@@ -2093,7 +2157,7 @@
                             display: flex;
                             justify-content: center;
                             align-items: flex-start;
-                            min-height: 100vh;
+                            min-height: 10vh; /* Changed to vh to prevent large blank space */
                         }
                         #receipt-content-in-print {
                             width: 80mm;
@@ -3042,10 +3106,197 @@
             calculateTotals();
         }
 
+        // --- User Management Functions ---
+
+        /**
+         * Renders the list of existing users in the User Management tab.
+         */
+        function renderUsers() {
+            userListEl.innerHTML = ''; // Clear existing list
+
+            if (users.length === 0) {
+                emptyUsersMessageEl.classList.remove('hidden');
+                return;
+            } else {
+                emptyUsersMessageEl.classList.add('hidden');
+            }
+
+            // Sort users by email
+            const sortedUsers = [...users].sort((a, b) => a.email.localeCompare(b.email));
+
+            const userTable = document.createElement('table');
+            userTable.className = 'w-full table-auto border-collapse border border-gray-600 text-gray-200';
+            userTable.innerHTML = `
+                <thead class="bg-gray-700">
+                    <tr>
+                        <th class="px-4 py-2 text-left border border-gray-600">Email</th>
+                        <th class="px-4 py-2 text-left border border-gray-600">Role</th>
+                        <th class="px-4 py-2 text-center border border-gray-600">Actions</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            `;
+            const tbody = userTable.querySelector('tbody');
+
+            sortedUsers.forEach((userItem, index) => {
+                // Ensure we don't allow editing/deleting the currently logged-in admin user's own role
+                const isCurrentUser = userItem.id === userId;
+                const actionsHtml = isCurrentUser ?
+                    `<span class="text-gray-500 text-sm">Current User</span>` :
+                    `<button data-user-id="${userItem.id}" data-user-email="${userItem.email}" data-user-role="${userItem.role}"
+                            class="edit-user-btn px-3 py-1 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 text-sm mr-2">
+                        Edit Role
+                    </button>
+                    <button data-user-id="${userItem.id}" data-user-email="${userItem.email}"
+                            class="delete-user-btn px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm">
+                        Delete
+                    </button>`;
+
+                const row = tbody.insertRow();
+                row.className = index % 2 === 0 ? 'bg-gray-800' : 'bg-gray-900'; // Zebra stripping
+                row.innerHTML = `
+                    <td class="px-4 py-2 border border-gray-700 text-left">${userItem.email}</td>
+                    <td class="px-4 py-2 border border-gray-700 text-left">${userItem.role.charAt(0).toUpperCase() + userItem.role.slice(1)}</td>
+                    <td class="px-4 py-2 border border-gray-700 text-center">${actionsHtml}</td>
+                `;
+            });
+            userListEl.appendChild(userTable);
+
+            // Add event listeners for "Edit Role" and "Delete" buttons
+            document.querySelectorAll('.edit-user-btn').forEach(button => {
+                button.addEventListener('click', (event) => {
+                    const id = event.target.dataset.userId;
+                    const email = event.target.dataset.userEmail;
+                    const role = event.target.dataset.userRole;
+                    openEditUserRoleModal(id, email, role);
+                });
+            });
+
+            document.querySelectorAll('.delete-user-btn').forEach(button => {
+                button.addEventListener('click', (event) => {
+                    const id = event.target.dataset.userId;
+                    const email = event.target.dataset.userEmail;
+                    deleteUser(id, email);
+                });
+            });
+        }
+
+        /**
+         * Opens the modal to edit a user's role.
+         * @param {string} id - The Firestore document ID of the user's role.
+         * @param {string} email - The user's email.
+         * @param {string} currentRole - The user's current role.
+         */
+        function openEditUserRoleModal(id, email, currentRole) {
+            if (userRole !== 'admin') {
+                showMessageBox('Access Denied', 'You do not have permission to edit user roles.');
+                return;
+            }
+            editUserEmailDisplayEl.textContent = email;
+            editUserRoleSelectEl.value = currentRole;
+            saveUserRoleBtn.dataset.editingUserId = id; // Store the user ID
+
+            editUserRoleModalContainer.classList.remove('hidden');
+        }
+
+        /**
+         * Closes the edit user role modal.
+         */
+        function closeEditUserRoleModal() {
+            editUserRoleModalContainer.classList.add('hidden');
+            editUserEmailDisplayEl.textContent = '';
+            editUserRoleSelectEl.value = 'user';
+            delete saveUserRoleBtn.dataset.editingUserId;
+        }
+
+        /**
+         * Saves the edited user role to Firestore.
+         */
+        async function saveEditedUserRole() {
+            if (!isFirebaseReady || userRole !== 'admin') {
+                showMessageBox('Access Denied', 'You do not have permission to save user role changes.');
+                return;
+            }
+            const id = saveUserRoleBtn.dataset.editingUserId;
+            const newRole = editUserRoleSelectEl.value;
+            const userEmail = editUserEmailDisplayEl.textContent; // For display in message box
+
+            if (!id) {
+                showMessageBox('Error', 'No user selected for editing.');
+                return;
+            }
+
+            // Prevent admin from changing their own role (as this could lock them out)
+            if (id === userId) {
+                showMessageBox('Forbidden', 'You cannot change your own role through this interface.');
+                return;
+            }
+
+            const confirmed = await showMessageBox(
+                'Confirm Role Change',
+                `Are you sure you want to change the role of "${userEmail}" to "${newRole}"?`,
+                true
+            );
+
+            if (confirmed) {
+                try {
+                    const userDocRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/users`, id);
+                    await firebase.updateDoc(userDocRef, { role: newRole });
+                    showMessageBox('Success', `Role for "${userEmail}" updated to "${newRole}" successfully.`);
+                    closeEditUserRoleModal();
+                } catch (error) {
+                    console.error("Error updating user role:", error);
+                    showMessageBox('Error', `Failed to update user role: ${error.message || 'Please try again.'}`);
+                }
+            }
+        }
+
+        /**
+         * Deletes a user's role document from Firestore.
+         * Note: This does NOT delete the user from Firebase Authentication.
+         * Full user deletion requires server-side (Firebase Admin SDK).
+         * Here, it effectively removes their app access/role.
+         * @param {string} id - The Firestore document ID of the user's role.
+         * @param {string} email - The user's email for display.
+         */
+        async function deleteUser(id, email) {
+            if (!isFirebaseReady || userRole !== 'admin') {
+                showMessageBox('Access Denied', 'You do not have permission to delete users.');
+                return;
+            }
+
+            // Prevent admin from deleting themselves
+            if (id === userId) {
+                showMessageBox('Forbidden', 'You cannot delete your own user account through this interface.');
+                return;
+            }
+
+            const confirmed = await showMessageBox(
+                'Confirm User Deletion',
+                `Are you sure you want to delete the user "${email}"? This will remove their access to the system roles. Their authentication account may still exist in Firebase.`,
+                true
+            );
+
+            if (confirmed) {
+                try {
+                    const userDocRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/users`, id);
+                    await firebase.deleteDoc(userDocRef);
+                    showMessageBox('Success', `User "${email}" role deleted successfully.`);
+                    // Listener will re-render the user list
+                } catch (error) {
+                    console.error("Error deleting user role:", error);
+                    showMessageBox('Error', `Failed to delete user role: ${error.message || 'Please try again.'}`);
+                }
+            }
+        }
+
+
         // --- Firestore Listeners ---
         let inventoryUnsubscribe;
         let salesLogsUnsubscribe;
         let couponsUnsubscribe;
+        let usersUnsubscribe; // New: Unsubscribe for users listener
+
 
         // Function to set up Firestore listeners (called after Firebase is ready)
         function setupFirestoreListeners() {
@@ -3060,6 +3311,8 @@
             const salesLogsCollectionRef = firebase.collection(db, `artifacts/${currentAppId}/public/data/salesLogs`);
             // Reference to the public coupons collection
             const couponsCollectionRef = firebase.collection(db, `artifacts/${currentAppId}/public/data/coupons`);
+            // Reference to the public users collection
+            const usersCollectionRef = firebase.collection(db, `artifacts/${currentAppId}/public/data/users`);
 
 
             // Inventory Listener
@@ -3153,6 +3406,24 @@
                 if (auth.currentUser && userRole === 'admin') {
                     showMessageBox('Data Error', 'Failed to load coupon data. Please check your connection and security rules.');
                 }
+            });
+
+            // New: Users Listener
+            userListLoadingEl.classList.remove('hidden');
+            usersUnsubscribe = firebase.onSnapshot(usersCollectionRef, (snapshot) => {
+                const fetchedUsers = [];
+                snapshot.forEach(doc => {
+                    fetchedUsers.push({ id: doc.id, ...doc.data() });
+                });
+                users = fetchedUsers; // Update global users array
+                renderUsers(); // Render the user list
+                userListLoadingEl.classList.add('hidden');
+            }, (error) => {
+                console.error("Error listening to users:", error);
+                if (auth.currentUser && userRole === 'admin') {
+                    showMessageBox('Data Error', 'Failed to load user data. Please check your connection and security rules.');
+                }
+                userListLoadingEl.classList.add('hidden');
             });
         }
 
@@ -3490,6 +3761,16 @@
             existingCouponsListEl = document.getElementById('existing-coupons-list');
             emptyCouponsMessageEl = document.getElementById('empty-coupons-message');
 
+            // Assign new user management DOM elements
+            userListEl = document.getElementById('user-list');
+            emptyUsersMessageEl = document.getElementById('empty-users-message');
+            userListLoadingEl = document.getElementById('user-list-loading');
+            editUserRoleModalContainer = document.getElementById('edit-user-role-modal-container');
+            editUserRoleModalCloseBtn = document.getElementById('edit-user-role-modal-close-btn');
+            editUserEmailDisplayEl = document.getElementById('edit-user-email-display');
+            editUserRoleSelectEl = document.getElementById('edit-user-role-select');
+            saveUserRoleBtn = document.getElementById('save-user-role-btn');
+
 
             // Set FIREBASE_CONFIG - IMPORTANT: Use your actual Firebase config here for external deployment
             FIREBASE_CONFIG = {
@@ -3525,7 +3806,9 @@
                 window.firebase.onAuthStateChanged(auth, async (user) => {
                     if (user) {
                         userId = user.uid;
-                        userIdDisplayEl.textContent = `User ID: ${userId}`;
+                        // Hiding user ID display as per user request
+                        // userIdDisplayEl.textContent = `User ID: ${userId}`;
+
                         // Fetch user's role from Firestore
                         // Use currentAppId for the Firestore path
                         const userDocRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/users`, userId);
@@ -3561,7 +3844,8 @@
                         // User is signed out or no user is logged in
                         userId = 'Not Logged In';
                         userRole = 'guest'; // Reset role to guest
-                        userIdDisplayEl.textContent = `User ID: ${userId}`;
+                        // Hiding user ID display as per user request
+                        // userIdDisplayEl.textContent = `User ID: ${userId}`;
                         console.log('User logged out. Role reset to guest.'); // Added for debugging
 
                         // Hide main app content and show login modal
@@ -3573,11 +3857,13 @@
                         if (inventoryUnsubscribe) inventoryUnsubscribe();
                         if (salesLogsUnsubscribe) salesLogsUnsubscribe();
                         if (couponsUnsubscribe) couponsUnsubscribe(); // Unsubscribe coupons too
+                        if (usersUnsubscribe) usersUnsubscribe(); // New: Unsubscribe users too
                         // Clear data when logged out
                         inventory = [];
                         cart = [];
                         salesLogs = [];
                         coupons = []; // Clear coupons
+                        users = []; // Clear users
                         appliedCoupon = null; // Clear applied coupon
                         couponCodeInputEl.value = ''; // Clear coupon input
                         couponStatusMessageEl.textContent = ''; // Clear coupon message
@@ -3586,12 +3872,14 @@
                         renderReportLogs();
                         renderSalesReport();
                         renderCoupons(); // Re-render coupons (will show empty message)
+                        renderUsers(); // Re-render users (will show empty message)
                     }
                 });
             } catch (error) {
                 console.error("Failed to initialize Firebase:", error);
                 showMessageBox('Initialization Error', 'Failed to initialize Firebase. Please check your configuration and internet connection.');
-                userIdDisplayEl.textContent = `User ID: Not Available`;
+                // Hiding user ID display as per user request
+                // userIdDisplayEl.textContent = `User ID: Not Available`;
             }
 
             // Event Listeners - Now assigned after DOM elements are available
@@ -3722,6 +4010,8 @@
 
             // User Management Listener
             addNewUserBtnEl.addEventListener('click', addNewUser);
+            editUserRoleModalCloseBtn.addEventListener('click', closeEditUserRoleModal); // Close user role edit modal
+            saveUserRoleBtn.addEventListener('click', saveEditedUserRole); // Save user role
 
             // Initial renders (these will be empty/default until login occurs and data loads)
             renderCart();
