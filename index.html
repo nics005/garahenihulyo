@@ -217,7 +217,9 @@
             <header id="main-header">
                 <div class="flex items-center space-x-4">
                     <!-- Custom logo added based on user request -->
-                    <img src="https://scontent.fmnl17-2.fna.fbcdn.net/v/t39.30808-6/432725210_122115657752230587_8420052317826264936_n.jpg?_nc_cat=107&ccb=1-7&_nc_sid=6ee11a&_nc_eui2=AeFQuix_sgAinwvqEloWRmRrKmfC3maObI8qZ8LeZo5sj8vAQqr_JC9Fpw20JNKdwyGEmKxHmeCS13eK7cNozFC4&_nc_ohc=yXMR9-p-LkAQ7kNvwEGM_iE&_nc_oc=AdkR9Ic0Mv9IkLgZKC9xU5_Me3UPAFxAPa3C_vdUioSCL4JuWwbXHRxqo946zUguqM&_nc_zt=23&_nc_ht=scontent.fmnl17-2.fna&_nc_gid=BW0dXenNjVSN0gfgFBLyNg&oh=00_AfNVOOLzzAt2XcEsqDJf0PXbRUm3bxfLEljZ6djGhEP5uw&oe=68620775" alt="Garahe ni Hulyo Logo" class="rounded-full w-12 h-12 object-cover">
+                    <img src="https://placehold.co/48x48/000000/FFFFFF?text=Logo"
+                         onerror="this.onerror=null;this.src='https://placehold.co/48x48/000000/FFFFFF?text=Logo';"
+                         alt="Garahe ni Hulyo Logo" class="rounded-full w-12 h-12 object-cover">
                     <h1 class="text-3xl font-extrabold text-white">Garahe ni Hulyo POS System</h1>
                 </div>
                 <!-- User ID Display - Hidden as per user request -->
@@ -851,6 +853,13 @@
         let userRole = 'guest'; // Default role, 'guest' means not logged in
         let isFirebaseReady = false;
 
+        // Global variables to temporarily store admin credentials for re-login after creating a new user.
+        // WARNING: Storing user passwords in client-side variables is a security risk.
+        // For production, consider using Firebase Cloud Functions with Admin SDK for user creation.
+        let _adminEmail = null;
+        let _adminPassword = null;
+
+
         // Data Models - These will now be synchronized with Firestore
         let inventory = []; // Fetched from Firestore
         let cart = []; // Still in-memory for current transaction
@@ -1397,7 +1406,7 @@
             saleData.items.forEach(item => {
                 const itemDiv = document.createElement('div');
                 itemDiv.className = `
-                    flex justify-between items-center py-1 border-b border-gray-800 last:border-b-0
+                    flex justify-between items-center py-2 border-b border-gray-800 last:border-b-0
                 `;
                 itemDiv.innerHTML = `
                     <span class="text-gray-200">${item.name} x ${formatNumber(item.quantity)}</span>
@@ -2585,7 +2594,7 @@
                 filteredSales.sort((a, b) => {
                     const dateA = a.timestamp.toDate ? a.timestamp.toDate() : new Date(a.timestamp);
                     const dateB = b.timestamp.toDate ? b.timestamp.toDate() : new Date(b.timestamp);
-                    return dateB - dateA;
+                    return dateB - dateA; // Newest first
                 });
 
                 filteredSales.forEach((log, index) => {
@@ -2780,7 +2789,7 @@
                 return dateB - dateA; // Newest first
             });
 
-            salesForDetailedReport.forEach(log => {
+            salesLogsData.forEach(log => {
                 const logDate = (log.timestamp.toDate ? log.timestamp.toDate() : new Date(log.timestamp)).toLocaleDateString();
                 const logTime = (log.timestamp.toDate ? log.timestamp.toDate() : new Date(log.timestamp)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 const itemsSoldDetails = log.items.map(item => `${item.name} (x${formatNumber(item.quantity)})`).join(', ');
@@ -3121,8 +3130,12 @@
                 emptyUsersMessageEl.classList.add('hidden');
             }
 
-            // Sort users by email
-            const sortedUsers = [...users].sort((a, b) => a.email.localeCompare(b.email));
+            // Sort users by email, handling null/undefined emails gracefully
+            const sortedUsers = [...users].sort((a, b) => {
+                const emailA = a.email || ''; // Use empty string if email is null/undefined
+                const emailB = b.email || ''; // Use empty string if email is null/undefined
+                return emailA.localeCompare(emailB);
+            });
 
             const userTable = document.createElement('table');
             userTable.className = 'w-full table-auto border-collapse border border-gray-600 text-gray-200';
@@ -3519,7 +3532,18 @@
             try {
                 const userCredential = await firebase.signInWithEmailAndPassword(auth, email, password);
                 // Auth state listener will handle updating UI and userRole
-                // No need to call closeLoginModal() here, onAuthStateChanged handles it.
+                // If the logged-in user is an admin, store their credentials temporarily
+                // for the scenario where they create a new user and need to re-login.
+                if (userCredential.user) {
+                     // Check if the user is an admin after successful login
+                    const userDocRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/users`, userCredential.user.uid);
+                    const userDocSnap = await firebase.getDoc(userDocRef);
+                    if (userDocSnap.exists() && userDocSnap.data().role === 'admin') {
+                        _adminEmail = email;
+                        _adminPassword = password;
+                    }
+                }
+
                 showMessageBox('Login Success', `Welcome, ${userCredential.user.email}!`);
             } catch (error) {
                 console.error("Login error:", error);
@@ -3546,6 +3570,9 @@
                 try {
                     await firebase.signOut(auth);
                     showMessageBox('Logout Success', 'You have been logged out.');
+                    // Clear any stored admin credentials on logout
+                    _adminEmail = null;
+                    _adminPassword = null;
                     // onAuthStateChanged will handle role and UI update and showing login modal
                 } catch (error) {
                     console.error("Logout error:", error);
@@ -3578,9 +3605,12 @@
             }
 
             try {
+                // Store current admin's UID before creating new user, as auth.currentUser will change
+                const currentAdminUid = auth.currentUser ? auth.currentUser.uid : null;
+
                 // Create user in Firebase Authentication
-                const userCredential = await firebase.createUserWithEmailAndPassword(auth, email, password);
-                const newUid = userCredential.user.uid;
+                const newUserCredential = await firebase.createUserWithEmailAndPassword(auth, email, password);
+                const newUid = newUserCredential.user.uid;
 
                 // Set user role in Firestore
                 // Use currentAppId for the Firestore path
@@ -3590,7 +3620,19 @@
                     createdAt: firebase.serverTimestamp()
                 });
 
-                showMessageBox('User Added', `User "${email}" added successfully with role "${role}".`);
+                // IMPORTANT: Re-login the original admin user after new user creation.
+                // This addresses the issue where `createUserWithEmailAndPassword` automatically signs in the new user.
+                // WARNING: This approach requires temporarily holding the admin's password in client-side memory.
+                // For a production application, consider using Firebase Cloud Functions with Admin SDK
+                // to create users without changing the client's current authentication state.
+                if (_adminEmail && _adminPassword) {
+                    await firebase.signInWithEmailAndPassword(auth, _adminEmail, _adminPassword);
+                    showMessageBox('User Added', `User "${email}" added successfully. You have been re-logged in as admin.`);
+                } else {
+                    showMessageBox('User Added', `User "${email}" added successfully. Please manually log back in as admin if your session changed.`);
+                }
+
+                // Clear form
                 newUserEmailEl.value = '';
                 newUserPasswordEl.value = '';
                 newUserRoleEl.value = 'user'; // Reset to default
@@ -3603,6 +3645,8 @@
                     errorMessage = 'The email address is not valid.';
                 } else if (error.code === 'auth/weak-password') {
                     errorMessage = 'The password is too weak. Please choose a stronger password.';
+                } else if (error.code === 'auth/network-request-failed') {
+                    errorMessage = 'Network error. Please check your internet connection.';
                 }
                 showMessageBox('User Add Error', errorMessage);
             }
