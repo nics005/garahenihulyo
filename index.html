@@ -9,6 +9,8 @@
     <!-- jsPDF and html2canvas for PDF generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- jsPDF-AutoTable for generating tables in PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
     <style>
         /* Custom scrollbar for a metallic look */
         ::-webkit-scrollbar {
@@ -254,11 +256,17 @@
                 <!-- Inventory Content Area -->
                 <div id="inventory-content" class="tab-content flex-1 flex flex-col">
                     <h1 class="text-3xl font-bold text-white mb-6 text-center">Product Listing</h1>
-                    <!-- Search Bar -->
-                    <div class="mb-6">
+                    <!-- Search and Filter Bar -->
+                    <div class="flex flex-col sm:flex-row gap-4 mb-6">
                         <input type="text" id="inventory-search" placeholder="Search for parts..."
-                               class="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 placeholder-gray-500
+                               class="w-full sm:flex-1 p-3 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 placeholder-gray-500
                                       focus:outline-none focus:ring-2 focus:ring-blue-600 transition duration-200">
+                        <select id="category-filter"
+                                class="w-full sm:w-auto p-3 rounded-lg bg-gray-800 border border-gray-700 text-gray-200
+                                       focus:outline-none focus:ring-2 focus:ring-blue-600 transition duration-200">
+                            <!-- Categories will be dynamically loaded here -->
+                            <option value="all">All Categories</option>
+                        </select>
                     </div>
                     <!-- Loading Indicator for Inventory -->
                     <div id="inventory-loading" class="flex justify-center items-center h-full hidden">
@@ -834,6 +842,7 @@
         let couponManagementContentEl, newCouponCodeEl, newCouponTypeEl, newCouponValueEl, newCouponValidFromEl, newCouponValidUntilEl, newCouponUsageLimitEl, createNewCouponBtn; // New coupon creation elements
         let existingCouponsListEl, emptyCouponsMessageEl; // Existing coupons display
         let emptyInventoryMessageEl; // New: Empty inventory message element
+        let categoryFilterEl; // New: Category filter dropdown element
 
         // --- Helper Functions ---
 
@@ -906,7 +915,19 @@
         function renderInventory(items = inventory) {
             inventoryListEl.innerHTML = ''; // Clear existing items
 
-            if (items.length === 0) {
+            const currentSearchTerm = inventorySearchEl.value.toLowerCase().trim();
+            const selectedCategory = categoryFilterEl.value;
+
+            // Filter items based on search term and selected category
+            const filteredAndCategorizedItems = items.filter(item => {
+                const matchesSearch = item.name.toLowerCase().includes(currentSearchTerm) ||
+                                      (item.category && item.category.toLowerCase().includes(currentSearchTerm));
+                const matchesCategory = selectedCategory === 'all' || (item.category && item.category.toLowerCase() === selectedCategory.toLowerCase());
+                return matchesSearch && matchesCategory;
+            });
+
+
+            if (filteredAndCategorizedItems.length === 0) {
                 emptyInventoryMessageEl.classList.remove('hidden'); // Show empty message
                 return;
             } else {
@@ -914,7 +935,7 @@
             }
 
             // Sort items alphabetically by name
-            const sortedItems = [...items].sort((a, b) => a.name.localeCompare(b.name));
+            const sortedItems = [...filteredAndCategorizedItems].sort((a, b) => a.name.localeCompare(b.name));
 
             sortedItems.forEach(item => {
                 // Display the true, current stock level directly from Firestore.
@@ -959,6 +980,38 @@
                 });
             });
         }
+
+        /**
+         * Populates the category filter dropdown with unique categories from the inventory.
+         */
+        function populateCategoryFilter() {
+            const categories = new Set();
+            inventory.forEach(item => {
+                if (item.category && item.category.trim() !== '') {
+                    categories.add(item.category.trim());
+                }
+            });
+
+            // Clear existing options, but keep the "All Categories" option if it exists
+            const currentSelectedValue = categoryFilterEl.value;
+            categoryFilterEl.innerHTML = '<option value="all">All Categories</option>'; // Always reset with 'All'
+
+            const sortedCategories = Array.from(categories).sort((a, b) => a.localeCompare(b));
+            sortedCategories.forEach(category => {
+                const option = document.createElement('option');
+                option.value = category;
+                option.textContent = category;
+                categoryFilterEl.appendChild(option);
+            });
+
+            // Restore previous selection if it's still a valid category
+            if (currentSelectedValue && (currentSelectedValue === 'all' || categories.has(currentSelectedValue))) {
+                categoryFilterEl.value = currentSelectedValue;
+            } else {
+                categoryFilterEl.value = 'all'; // Default to all if previous is invalid
+            }
+        }
+
 
         /**
          * Renders the cart list and updates totals in the right panel.
@@ -1491,19 +1544,21 @@
         }
 
         /**
-         * Filters the inventory based on the search input.
+         * Filters the inventory based on the search input and selected category.
          * @returns {Array<Object>} Filtered inventory items.
          */
         function getFilteredInventory() {
             const searchTerm = inventorySearchEl.value.toLowerCase().trim();
-            if (!searchTerm) {
-                return inventory; // `inventory` is now kept in sync by Firestore listener
-            }
-            return inventory.filter(item =>
-                item.name.toLowerCase().includes(searchTerm) ||
-                (item.category && item.category.toLowerCase().includes(searchTerm))
-            );
+            const selectedCategory = categoryFilterEl.value;
+
+            return inventory.filter(item => {
+                const matchesSearch = item.name.toLowerCase().includes(searchTerm) ||
+                                      (item.category && item.category.toLowerCase().includes(searchTerm));
+                const matchesCategory = selectedCategory === 'all' || (item.category && item.category.toLowerCase() === selectedCategory.toLowerCase());
+                return matchesSearch && matchesCategory;
+            });
         }
+
 
         /**
          * Filters the master list based on the search input.
@@ -1946,6 +2001,7 @@
             appliedCoupon = null;
             couponCodeInputEl.value = '';
             couponStatusMessageEl.textContent = '';
+            appliedDiscountDisplayRowEl.classList.add('hidden');
             calculateTotals(); // Recalculate totals to remove discount
         }
 
@@ -2508,68 +2564,188 @@
 
         /**
          * Downloads the current sales report as a PDF.
+         * Now uses jsPDF-AutoTable to generate Excel-like tables.
          */
         async function generatePdfReport() {
             // Re-render sales report just before generating PDF to ensure it's up-to-date.
             renderSalesReport();
 
-            const element = document.getElementById('sales-report-content'); // Target the entire report content area
             const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4'); // 'p' for portrait, 'mm' for millimeters, 'a4' size
 
-            // Hide buttons that should not appear in the PDF
-            const buttonsToHide = [filterDailyBtn, filterWeeklyBtn, filterMonthlyBtn, downloadReportPdfBtn];
-            buttonsToHide.forEach(btn => btn.classList.add('hidden'));
+            // Add title to the PDF
+            doc.setFontSize(20);
+            doc.text("Garahe ni Hulyo Sales Report", 105, 20, { align: 'center' }); // Centered title
+            doc.setFontSize(12);
+            doc.text(`${reportPeriodInfoEl.textContent}`, 105, 28, { align: 'center' }); // Period info
+            doc.text(`Total Sales for Period: ${reportTotalSalesEl.textContent}`, 105, 38, { align: 'center' });
 
-            try {
-                // Generate canvas from HTML element
-                const canvas = await html2canvas(element, {
-                    scale: 2, // Increase scale for better quality
-                    useCORS: true,
-                    logging: false
-                });
+            let yOffset = 50; // Starting Y position for the first table
 
-                const imgData = canvas.toDataURL('image/png');
-                const imgWidth = 210; // A4 width in mm
-                const pageHeight = 297; // A4 height in mm
-                const imgHeight = canvas.height * imgWidth / canvas.width;
-                let heightLeft = imgHeight;
+            // --- Items Sold Summary Table ---
+            doc.setFontSize(16);
+            doc.text("Items Sold Summary:", 15, yOffset);
+            yOffset += 10;
 
-                const doc = new jsPDF('p', 'mm', 'a4');
-                let position = 0;
+            const itemsSummaryData = [];
+            const aggregatedItems = {}; // { productId: { name, quantity, totalRevenue } }
+            const nonVoidedSales = salesLogs.filter(log => !log.isVoided); // Ensure report is based on non-voided sales
 
-                // Add title to the PDF
-                doc.setFontSize(22);
-                doc.text("Garahe ni Hulyo Sales Report", imgWidth / 2, 20, { align: 'center' });
-                doc.setFontSize(12);
-                doc.text(`${reportPeriodInfoEl.textContent}`, imgWidth / 2, 30, { align: 'center' });
-                position = 40; // Adjust starting position for the image after title
+            nonVoidedSales.forEach(log => {
+                const logDate = log.timestamp.toDate ? log.timestamp.toDate() : new Date(log.timestamp);
+                let isValidForPeriod = false;
+                const now = new Date();
 
-                // Check if the image fits on one page
-                if (imgHeight <= (pageHeight - position)) {
-                    doc.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-                } else {
-                    // If not, add multiple pages
-                    doc.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-                    heightLeft -= (pageHeight - position);
-
-                    while (heightLeft >= 0) {
-                        position = heightLeft - imgHeight;
-                        doc.addPage();
-                        doc.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-                        heightLeft -= pageHeight;
-                    }
+                if (currentReportFilter === 'daily' && logDate.toDateString() === now.toDateString()) {
+                    isValidForPeriod = true;
+                } else if (currentReportFilter === 'weekly') {
+                    const startOfWeek = new Date(now);
+                    startOfWeek.setDate(now.getDate() - now.getDay());
+                    startOfWeek.setHours(0, 0, 0, 0);
+                    const endOfWeek = new Date(startOfWeek);
+                    endOfWeek.setDate(startOfWeek.getDate() + 6);
+                    endOfWeek.setHours(23, 59, 59, 999);
+                    isValidForPeriod = logDate >= startOfWeek && logDate <= endOfWeek;
+                } else if (currentReportFilter === 'monthly') {
+                    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+                    startOfMonth.setHours(0, 0, 0, 0);
+                    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                    endOfMonth.setHours(23, 59, 59, 999);
+                    isValidForPeriod = logDate >= startOfMonth && logDate <= endOfMonth;
                 }
 
-                doc.save(`Sales_Report_${currentReportFilter}_${new Date().toISOString().slice(0, 10)}.pdf`);
-                showMessageBox('Success', 'Sales report downloaded successfully as PDF!');
+                if (isValidForPeriod) {
+                    log.items.forEach(item => {
+                        if (!aggregatedItems[item.id]) {
+                            aggregatedItems[item.id] = {
+                                name: item.name,
+                                quantity: 0,
+                                totalRevenue: 0
+                            };
+                        }
+                        aggregatedItems[item.id].quantity += item.quantity;
+                        aggregatedItems[item.id].totalRevenue += (item.price * item.quantity);
+                    });
+                }
+            });
 
-            } catch (error) {
-                console.error("Error generating PDF:", error);
-                showMessageBox('Error', 'Failed to generate PDF. Please try again or check console for details.');
-            } finally {
-                // Ensure buttons are always shown again
-                buttonsToHide.forEach(btn => btn.classList.remove('hidden'));
-            }
+            Object.values(aggregatedItems).sort((a, b) => b.totalRevenue - a.totalRevenue).forEach(item => {
+                itemsSummaryData.push([item.name, formatNumber(item.quantity), formatCurrency(item.totalRevenue)]);
+            });
+
+            doc.autoTable({
+                startY: yOffset,
+                head: [['Item Name', 'Quantity Sold', 'Total Revenue']],
+                body: itemsSummaryData,
+                theme: 'grid', // 'striped' or 'grid'
+                styles: {
+                    font: 'helvetica',
+                    fontSize: 10,
+                    cellPadding: 2,
+                    halign: 'left', // Default align for text
+                    valign: 'middle'
+                },
+                headStyles: {
+                    fillColor: [47, 79, 79], // Dark Slate Gray
+                    textColor: [255, 255, 255],
+                    fontStyle: 'bold',
+                    halign: 'center' // Center headers
+                },
+                columnStyles: {
+                    1: { halign: 'right' }, // Align Quantity Sold to right
+                    2: { halign: 'right' }  // Align Total Revenue to right
+                },
+                margin: { top: 10, right: 15, bottom: 10, left: 15 },
+                didDrawPage: function (data) {
+                    // Footer
+                    let str = "Page " + doc.internal.getNumberOfPages();
+                    doc.setFontSize(10);
+                    doc.text(str, data.settings.margin.left, doc.internal.pageSize.height - 10);
+                }
+            });
+
+            yOffset = doc.autoTable.previous.finalY + 15; // Position for the next section
+
+            // --- Individual Sales Logs Table ---
+            doc.setFontSize(16);
+            doc.text("Individual Sales Logs:", 15, yOffset);
+            yOffset += 10;
+
+            const salesLogsData = [];
+            const salesForDetailedReport = nonVoidedSales.filter(log => {
+                const logDate = log.timestamp.toDate ? log.timestamp.toDate() : new Date(log.timestamp);
+                let isValidForPeriod = false;
+                const now = new Date();
+
+                if (currentReportFilter === 'daily' && logDate.toDateString() === now.toDateString()) {
+                    isValidForPeriod = true;
+                } else if (currentReportFilter === 'weekly') {
+                    const startOfWeek = new Date(now);
+                    startOfWeek.setDate(now.getDate() - now.getDay());
+                    startOfWeek.setHours(0, 0, 0, 0);
+                    const endOfWeek = new Date(startOfWeek);
+                    endOfWeek.setDate(startOfWeek.getDate() + 6);
+                    endOfWeek.setHours(23, 59, 59, 999);
+                    isValidForPeriod = logDate >= startOfWeek && logDate <= endOfWeek;
+                } else if (currentReportFilter === 'monthly') {
+                    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+                    startOfMonth.setHours(0, 0, 0, 0);
+                    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                    endOfMonth.setHours(23, 59, 59, 999);
+                    isValidForPeriod = logDate >= startOfMonth && logDate <= endOfMonth;
+                }
+                return isValidForPeriod;
+            }).sort((a, b) => {
+                const dateA = a.timestamp.toDate ? a.timestamp.toDate() : new Date(a.timestamp);
+                const dateB = b.timestamp.toDate ? b.timestamp.toDate() : new Date(b.timestamp);
+                return dateB - dateA; // Newest first
+            });
+
+            salesForDetailedReport.forEach(log => {
+                const logDate = (log.timestamp.toDate ? log.timestamp.toDate() : new Date(log.timestamp)).toLocaleDateString();
+                const logTime = (log.timestamp.toDate ? log.timestamp.toDate() : new Date(log.timestamp)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const itemsSoldDetails = log.items.map(item => `${item.name} (x${formatNumber(item.quantity)})`).join(', ');
+                salesLogsData.push([
+                    log.salesInvoiceId,
+                    `${logDate} ${logTime}`,
+                    log.customer.name,
+                    itemsSoldDetails,
+                    formatCurrency(log.total)
+                ]);
+            });
+
+            doc.autoTable({
+                startY: yOffset,
+                head: [['Invoice ID', 'Date/Time', 'Customer', 'Items Sold', 'Total']],
+                body: salesLogsData,
+                theme: 'grid',
+                styles: {
+                    font: 'helvetica',
+                    fontSize: 10,
+                    cellPadding: 2,
+                    halign: 'left',
+                    valign: 'top'
+                },
+                headStyles: {
+                    fillColor: [47, 79, 79],
+                    textColor: [255, 255, 255],
+                    fontStyle: 'bold',
+                    halign: 'center'
+                },
+                columnStyles: {
+                    4: { halign: 'right' } // Align Total to right
+                },
+                margin: { top: 10, right: 15, bottom: 10, left: 15 },
+                didDrawPage: function (data) {
+                    // Footer
+                    let str = "Page " + doc.internal.getNumberOfPages();
+                    doc.setFontSize(10);
+                    doc.text(str, data.settings.margin.left, doc.internal.pageSize.height - 10);
+                }
+            });
+
+            doc.save(`Sales_Report_${currentReportFilter}_${new Date().toISOString().slice(0, 10)}.pdf`);
+            showMessageBox('Success', 'Sales report downloaded successfully as PDF!');
         }
 
         // --- Coupon Management Functions ---
@@ -2879,6 +3055,7 @@
                 inventory = fetchedInventory; // Update global inventory array
                 productCounter = maxProductIdNum + 1; // Set productCounter for next unique ID
 
+                populateCategoryFilter(); // Populate category filter when inventory updates
                 renderInventory(getFilteredInventory()); // Re-render current view with new data
                 renderMasterList(getFilteredMasterList()); // Re-render master list with new data
                 inventoryLoadingEl.classList.add('hidden');
@@ -3162,6 +3339,7 @@
             inventorySearchEl = document.getElementById('inventory-search');
             checkoutButtonEl = document.getElementById('checkout-button');
             emptyInventoryMessageEl = document.getElementById('empty-inventory-message'); // Get new element
+            categoryFilterEl = document.getElementById('category-filter'); // Get new category filter
 
             tabInventoryBtn = document.getElementById('tab-inventory');
             tabManageProductsBtn = document.getElementById('tab-manage-products');
@@ -3394,6 +3572,11 @@
 
             // Event Listeners - Now assigned after DOM elements are available
             inventorySearchEl.addEventListener('input', () => {
+                renderInventory(getFilteredInventory());
+            });
+
+            // Category filter listener
+            categoryFilterEl.addEventListener('change', () => {
                 renderInventory(getFilteredInventory());
             });
 
