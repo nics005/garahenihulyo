@@ -325,14 +325,15 @@
                     <div class="bg-gray-800 p-6 rounded-lg shadow-md border border-gray-700 mb-6 flex-1 overflow-y-auto">
                         <h4 class="text-xl font-semibold text-blue-300 mb-4">Items Sold Summary:</h4>
                         <div id="report-items-summary">
-                            <!-- Detailed items sold will be rendered here -->
+                            <!-- Items sold summary will be rendered here as a table -->
+                            <p class="text-gray-400 text-center py-8" id="empty-items-summary-message">No items sold in this period.</p>
                         </div>
-                        <p class="text-gray-400 text-center py-8" id="empty-items-summary-message">No items sold in this period.</p>
                     </div>
 
                     <!-- Added div for individual sales logs in the sales report -->
                     <div id="report-details-list" class="bg-gray-800 p-6 rounded-lg shadow-md border border-gray-700 mb-6 flex-1 overflow-y-auto">
-                        <!-- Individual sales logs will be rendered here -->
+                        <!-- Individual sales logs will be rendered here as a table -->
+                        <p class="text-gray-400 text-center py-8" id="empty-details-list-message">No individual sales data for this period.</p>
                     </div>
 
                     <button id="download-report-pdf"
@@ -457,12 +458,12 @@
                     <!-- Coupon application section -->
                     <div class="mb-4 p-3 bg-gray-700 rounded-lg border border-gray-600">
                         <label for="coupon-code-input" class="block text-gray-300 text-sm font-bold mb-2">Apply Coupon:</label>
-                        <div class="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                        <div class="grid grid-cols-5 gap-2">
                             <input type="text" id="coupon-code-input" placeholder="Enter code"
-                                   class="col-span-1 sm:col-span-3 p-2 rounded-md bg-gray-800 border border-gray-700 text-gray-200 placeholder-gray-500
+                                   class="col-span-3 p-2 rounded-md bg-gray-800 border border-gray-700 text-gray-200 placeholder-gray-500
                                           focus:outline-none focus:ring-1 focus:ring-blue-500">
                             <button id="apply-coupon-btn"
-                                    class="col-span-1 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 active:bg-blue-700 transition duration-200">
+                                    class="col-span-2 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 active:bg-blue-700 transition duration-200">
                                 Apply
                             </button>
                         </div>
@@ -548,6 +549,12 @@
                                   focus:outline-none focus:ring-2 focus:ring-blue-600 transition duration-200">
                 </div>
                 <div class="mb-4">
+                    <label for="modal-new-product-category" class="block text-gray-300 text-sm font-bold mb-2">Category:</label>
+                    <input type="text" id="modal-new-product-category" placeholder="e.g., Engine Parts, Accessories"
+                           class="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 placeholder-gray-500
+                                  focus:outline-none focus:ring-2 focus:ring-blue-600 transition duration-200">
+                </div>
+                <div class="mb-4">
                     <label for="modal-new-product-price" class="block text-gray-300 text-sm font-bold mb-2">Price (₱):</label>
                     <input type="number" id="modal-new-product-price" step="0.01" min="0"
                            class="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 placeholder-gray-500
@@ -617,6 +624,12 @@
                 <div class="mb-4">
                     <label for="edit-product-name" class="block text-gray-300 text-sm font-bold mb-2">Product Name:</label>
                     <input type="text" id="edit-product-name"
+                           class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-gray-200 placeholder-gray-500
+                                  focus:outline-none focus:ring-2 focus:ring-blue-600 transition duration-200">
+                </div>
+                <div class="mb-4">
+                    <label for="edit-product-category" class="block text-gray-300 text-sm font-bold mb-2">Category:</label>
+                    <input type="text" id="edit-product-category"
                            class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-gray-200 placeholder-gray-500
                                   focus:outline-none focus:ring-2 focus:ring-blue-600 transition duration-200">
                 </div>
@@ -809,12 +822,12 @@
         let manageProductModalContainer, manageProductModalCloseBtn;
         let modalTabAddProductBtn, modalTabRestockProductBtn;
         let modalAddProductContent, modalRestockProductContent;
-        let modalNewProductNameEl, modalNewProductPriceEl, modalNewProductStockEl, modalNewProductRestockLevelEl, modalNewProductImageEl, modalImagePreviewEl, modalAddProductBtn;
+        let modalNewProductNameEl, modalNewProductCategoryEl, modalNewProductPriceEl, modalNewProductStockEl, modalNewProductRestockLevelEl, modalNewProductImageEl, modalImagePreviewEl, modalAddProductBtn; // Added modalNewProductCategoryEl
         let modalRestockSearchEl, modalRestockListEl, modalApplyRestockBtn;
-        let editProductDetailsModalContainer, editProductDetailsModalCloseBtn, editProductNameEl, editProductPriceEl, editProductStockEl, editProductRestockLevelEl, editProductImageEl, editImagePreviewEl, editProductSaveBtn;
+        let editProductDetailsModalContainer, editProductDetailsModalCloseBtn, editProductNameEl, editProductCategoryEl, editProductPriceEl, editProductStockEl, editProductRestockLevelEl, editProductImageEl, editImagePreviewEl, editProductSaveBtn; // Added editProductCategoryEl
         let saleSummaryModalContainer, saleSummaryModalCloseBtn, customerNameEl, customerAddressEl, customerContactEl, saleSummaryItemsListEl, summarySubtotalEl, summaryTotalEl, saleSummaryCancelBtn, saleSummaryCheckoutBtn, summaryAppliedDiscountEl; // Added summary applied discount
         let receiptModalContainer, receiptModalContentTemplate, activeReceiptPrintBtn, activeReceiptNewSaleBtn, receiptCloseBtn, receiptDiscountEl, receiptDiscountRowEl; // Added receipt discount
-        let salesReportContentEl, filterDailyBtn, filterWeeklyBtn, filterMonthlyBtn, reportTotalSalesEl, reportPeriodInfoEl, reportDetailsListEl, emptyReportMessageEl, emptyItemsSummaryMessageEl, downloadReportPdfBtn, reportItemsSummaryEl;
+        let salesReportContentEl, filterDailyBtn, filterWeeklyBtn, filterMonthlyBtn, reportTotalSalesEl, reportPeriodInfoEl, reportDetailsListEl, emptyReportMessageEl, emptyItemsSummaryMessageEl, emptyDetailsListMessageEl, downloadReportPdfBtn, reportItemsSummaryEl; // Added emptyDetailsListMessageEl
         let loginLogoutButtonEl, loginModalContainerEl, loginEmailEl, loginPasswordEl, loginSubmitBtnEl, currentUserRoleEl; // New elements for login
         let userManagementContentEl, newUserEmailEl, newUserPasswordEl, newUserRoleEl, addNewUserBtnEl; // New elements for user management
         let couponCodeInputEl, applyCouponBtn, couponStatusMessageEl, appliedDiscountEl, appliedDiscountDisplayRowEl; // New coupon application elements
@@ -830,7 +843,17 @@
          * @returns {string} Formatted currency string.
          */
         function formatCurrency(amount) {
-            return `₱${amount.toFixed(2)}`; // Changed to PHP symbol
+            // Use toLocaleString for comma separation and ensure 2 decimal places
+            return `₱${parseFloat(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        }
+
+        /**
+         * Formats a number with comma separators.
+         * @param {number} num
+         * @returns {string} Formatted number string.
+         */
+        function formatNumber(num) {
+            return parseFloat(num).toLocaleString('en-US');
         }
 
         /**
@@ -894,7 +917,7 @@
             const sortedItems = [...items].sort((a, b) => a.name.localeCompare(b.name));
 
             sortedItems.forEach(item => {
-                // Determine the currently available stock (true stock from Firestore)
+                // Display the true, current stock level directly from Firestore.
                 const currentAvailableStock = item.stock;
 
                 const itemDiv = document.createElement('div');
@@ -910,7 +933,8 @@
                              alt="${item.name}" class="w-12 h-12 rounded-full object-cover border border-gray-600">
                         <div>
                             <h3 class="text-lg font-semibold text-blue-300">${item.name}</h3>
-                            <p class="text-sm text-gray-400">Stock: <span class="font-medium text-gray-200">${currentAvailableStock}</span></p>
+                            <p class="text-sm text-gray-400">Category: <span class="font-medium text-gray-200">${item.category || 'N/A'}</span></p>
+                            <p class="text-sm text-gray-400">Stock: <span class="font-medium text-gray-200">${formatNumber(currentAvailableStock)}</span></p>
                         </div>
                     </div>
                     <div class="flex items-center space-x-3">
@@ -1025,7 +1049,8 @@
 
             const searchTerm = masterListSearchEl.value.toLowerCase().trim();
             const filteredItems = items.filter(item =>
-                item.name.toLowerCase().includes(searchTerm)
+                item.name.toLowerCase().includes(searchTerm) ||
+                (item.category && item.category.toLowerCase().includes(searchTerm))
             );
 
             if (filteredItems.length === 0) {
@@ -1052,7 +1077,8 @@
                              alt="${item.name}" class="w-12 h-12 rounded-full object-cover border border-gray-600">
                         <div>
                             <h3 class="text-lg font-semibold text-blue-300">${item.name}</h3>
-                            <p class="text-sm text-gray-400">Stock: <span class="font-medium text-gray-200">${item.stock}</span> | Restock: <span class="font-medium text-gray-200">${item.restockLevel || 'N/A'}</span></p>
+                            <p class="text-sm text-gray-400">Category: <span class="font-medium text-gray-200">${item.category || 'N/A'}</span></p>
+                            <p class="text-sm text-gray-400">Stock: <span class="font-medium text-gray-200">${formatNumber(item.stock)}</span> | Restock: <span class="font-medium text-gray-200">${formatNumber(item.restockLevel || 0)}</span></p>
                         </div>
                     </div>
                     <div class="flex items-center space-x-2">
@@ -1100,7 +1126,8 @@
 
             const searchTerm = modalRestockSearchEl.value.toLowerCase().trim();
             const filteredItems = items.filter(item =>
-                item.name.toLowerCase().includes(searchTerm)
+                item.name.toLowerCase().includes(searchTerm) ||
+                (item.category && item.category.toLowerCase().includes(searchTerm))
             );
 
             if (filteredItems.length === 0) {
@@ -1127,8 +1154,9 @@
                              alt="${item.name}" class="w-16 h-16 rounded-md object-cover border border-gray-600">
                         <div>
                             <h3 class="text-xl font-semibold text-blue-300">${item.name}</h3>
-                            <p class="text-gray-400">Current Stock: <span class="font-medium text-gray-200">${item.stock}</span></p>
-                            <p class="text-gray-500 text-sm">Restock Level: <span class="font-medium text-gray-400">${item.restockLevel || 'N/A'}</span></p>
+                            <p class="text-gray-400">Category: <span class="font-medium text-gray-200">${item.category || 'N/A'}</span></p>
+                            <p class="text-gray-400">Current Stock: <span class="font-medium text-gray-200">${formatNumber(item.stock)}</span></p>
+                            <p class="text-gray-500 text-sm">Restock Level: <span class="font-medium text-gray-400">${formatNumber(item.restockLevel || 0)}</span></p>
                         </div>
                     </div>
                     <div class="flex items-center space-x-3 w-32 sm:w-48">
@@ -1157,7 +1185,7 @@
                     flex justify-between items-center py-2 border-b border-gray-800 last:border-b-0
                 `;
                 itemDiv.innerHTML = `
-                    <span class="text-gray-200">${item.name} (x${item.quantity})</span>
+                    <span class="text-gray-200">${item.name} (x${formatNumber(item.quantity)})</span>
                     <span class="text-white font-semibold">${formatCurrency(item.price * item.quantity)}</span>
                 `;
                 saleSummaryItemsListEl.appendChild(itemDiv);
@@ -1270,7 +1298,7 @@
                     flex justify-between items-center py-1 border-b border-gray-800 last:border-b-0
                 `;
                 itemDiv.innerHTML = `
-                    <span class="text-gray-200">${item.name} x ${item.quantity}</span>
+                    <span class="text-gray-200">${item.name} x ${formatNumber(item.quantity)}</span>
                     <span class="font-semibold text-white">${formatCurrency(item.price * item.quantity)}</span>
                 `;
                 receiptItemsListEl.appendChild(itemDiv);
@@ -1348,9 +1376,9 @@
 
                 const cartItem = cart.find(item => item.id === itemId);
                 let currentQuantityInCart = cartItem ? cartItem.quantity : 0;
-                let availableStockForCart = inventoryItem.stock - currentQuantityInCart;
+                let availableStockForAdding = inventoryItem.stock - currentQuantityInCart;
 
-                if (availableStockForCart <= 0) {
+                if (availableStockForAdding <= 0) {
                     showMessageBox('Out of Stock', 'This item is currently out of stock or all available units are already in your cart.');
                     return;
                 }
@@ -1359,15 +1387,17 @@
                     // If item is already in cart, increment quantity
                     cartItem.quantity++;
                 } else {
+                    // Add category to cart item
                     cart.push({
                         id: inventoryItem.id,
                         name: inventoryItem.name,
                         price: inventoryItem.price,
                         quantity: 1,
-                        imageUrl: inventoryItem.imageUrl
+                        imageUrl: inventoryItem.imageUrl,
+                        category: inventoryItem.category // Include category
                     });
                 }
-                renderCart(); // Re-render cart and then inventory (via renderCart)
+                renderCart(); // Re-render cart. Inventory UI will update based on its listener.
             } catch (error) {
                 console.error("Error adding item to cart:", error);
                 showMessageBox('Error', 'Failed to add item to cart. Please try again.');
@@ -1376,7 +1406,6 @@
 
         /**
          * Sets the quantity of an item in the cart.
-         * Stock deduction is now only on finalizeSale.
          * @param {string} itemId - The ID of the item.
          * @param {number} newQuantity - The desired new quantity for the item.
          */
@@ -1398,36 +1427,33 @@
                 }
 
                 let quantityToSet = parseInt(newQuantity);
-                if (isNaN(quantityToSet) || quantityToSet < 0) { // Allow 0 to enable removal
+                if (isNaN(quantityToSet) || quantityToSet < 0) {
                     quantityToSet = 0;
                 }
 
                 // Calculate the max allowed quantity based on actual inventory stock
-                // This is the total original stock from inventory, clamped by newQuantity
                 const maxAllowed = inventoryItem.stock;
                 if (quantityToSet > maxAllowed) {
                     quantityToSet = maxAllowed;
-                    showMessageBox('Stock Limit Reached', `You can only add up to ${maxAllowed} of ${inventoryItem.name} to your cart.`);
+                    showMessageBox('Stock Limit Reached', `You can only add up to ${formatNumber(maxAllowed)} of ${inventoryItem.name} to your cart.`);
                 }
 
                 if (quantityToSet === 0) {
-                    // If new quantity is 0, remove from cart
                     cart.splice(cart.findIndex(item => item.id === itemId), 1);
                 } else {
                     cartItem.quantity = quantityToSet;
                 }
 
-                renderCart(); // Re-render cart and then inventory (via renderCart)
+                renderCart();
             } catch (error) {
                 console.error("Error setting cart quantity:", error);
                 showMessageBox('Error', 'Failed to update item quantity. Please try again.');
-                renderCart(); // Attempt to revert UI if there was an error
+                renderCart();
             }
         }
 
         /**
          * Removes an item completely from the cart.
-         * Stock is returned to 'available' for display, but not to Firestore until sale is voided.
          * @param {string} itemId - The ID of the item to remove.
          */
         async function removeItemFromCart(itemId) {
@@ -1440,7 +1466,7 @@
                 if (itemIndex > -1) {
                     cart.splice(itemIndex, 1); // Remove item from local cart array
                 }
-                renderCart(); // Re-render cart and then inventory (via renderCart)
+                renderCart();
             }
             catch (error) {
                 console.error("Error removing item from cart:", error);
@@ -1474,7 +1500,8 @@
                 return inventory; // `inventory` is now kept in sync by Firestore listener
             }
             return inventory.filter(item =>
-                item.name.toLowerCase().includes(searchTerm)
+                item.name.toLowerCase().includes(searchTerm) ||
+                (item.category && item.category.toLowerCase().includes(searchTerm))
             );
         }
 
@@ -1488,7 +1515,8 @@
                 return inventory;
             }
             return inventory.filter(item =>
-                item.name.toLowerCase().includes(searchTerm)
+                item.name.toLowerCase().includes(searchTerm) ||
+                (item.category && item.category.toLowerCase().includes(searchTerm))
             );
         }
 
@@ -1503,12 +1531,13 @@
                 return;
             }
             const name = modalNewProductNameEl.value.trim();
+            const category = modalNewProductCategoryEl.value.trim(); // Get category
             const price = parseFloat(modalNewProductPriceEl.value);
             const stock = parseInt(modalNewProductStockEl.value);
             const restockLevel = parseInt(modalNewProductRestockLevelEl.value);
 
-            if (!name || isNaN(price) || price <= 0 || isNaN(stock) || stock < 0 || isNaN(restockLevel) || restockLevel < 0) {
-                showMessageBox('Input Error', 'Please enter valid product name, price (>0), stock (>=0), and restock level (>=0).');
+            if (!name || !category || isNaN(price) || price <= 0 || isNaN(stock) || stock < 0 || isNaN(restockLevel) || restockLevel < 0) {
+                showMessageBox('Input Error', 'Please enter valid product name, category, price (>0), stock (>=0), and restock level (>=0).');
                 return;
             }
 
@@ -1534,6 +1563,7 @@
             const newProductId = 'item-' + String(productCounter++).padStart(3, '0');
             const newProductData = {
                 name: name,
+                category: category, // Save category
                 price: price,
                 stock: stock,
                 restockLevel: restockLevel,
@@ -1547,6 +1577,7 @@
                 await firebase.setDoc(docRef, newProductData);
 
                 modalNewProductNameEl.value = '';
+                modalNewProductCategoryEl.value = ''; // Clear category
                 modalNewProductPriceEl.value = '';
                 modalNewProductStockEl.value = '';
                 modalNewProductRestockLevelEl.value = '10'; // Reset to default
@@ -1592,7 +1623,7 @@
             if (restockedCount > 0) {
                 try {
                     await Promise.all(updates); // Execute all updates concurrently
-                    showMessageBox('Restock Complete', `Successfully restocked ${restockedCount} product(s) with a total of ${totalRestockedUnits} units.`);
+                    showMessageBox('Restock Complete', `Successfully restocked ${restockedCount} product(s) with a total of ${formatNumber(totalRestockedUnits)} units.`);
                     closeManageProductModal();
                 } catch (error) {
                     console.error("Error applying restock:", error);
@@ -1621,6 +1652,7 @@
 
             // Populate form fields
             editProductNameEl.value = itemToEdit.name;
+            editProductCategoryEl.value = itemToEdit.category || ''; // Populate category
             editProductPriceEl.value = itemToEdit.price;
             editProductStockEl.value = itemToEdit.stock;
             editProductRestockLevelEl.value = itemToEdit.restockLevel || '';
@@ -1649,6 +1681,7 @@
             editProductDetailsModalContainer.classList.add('hidden');
             // Clear fields and data attribute
             editProductNameEl.value = '';
+            editProductCategoryEl.value = ''; // Clear category
             editProductPriceEl.value = '';
             editProductStockEl.value = '';
             editProductRestockLevelEl.value = '';
@@ -1674,12 +1707,13 @@
             }
 
             const name = editProductNameEl.value.trim();
+            const category = editProductCategoryEl.value.trim(); // Get category
             const price = parseFloat(editProductPriceEl.value);
             const stock = parseInt(editProductStockEl.value);
             const restockLevel = parseInt(editProductRestockLevelEl.value);
 
-            if (!name || isNaN(price) || price <= 0 || isNaN(stock) || stock < 0 || isNaN(restockLevel) || restockLevel < 0) {
-                showMessageBox('Input Error', 'Please enter valid product name, price (>0), stock (>=0), and restock level (>=0).');
+            if (!name || !category || isNaN(price) || price <= 0 || isNaN(stock) || stock < 0 || isNaN(restockLevel) || restockLevel < 0) {
+                showMessageBox('Input Error', 'Please enter valid product name, category, price (>0), stock (>=0), and restock level (>=0).');
                 return;
             }
 
@@ -1702,6 +1736,7 @@
 
             const updatedProductData = {
                 name: name,
+                category: category, // Save category
                 price: price,
                 stock: stock,
                 restockLevel: restockLevel,
@@ -1853,6 +1888,7 @@
             manageProductModalContainer.classList.add('hidden');
             // Clear Add Product form fields
             modalNewProductNameEl.value = '';
+            modalNewProductCategoryEl.value = ''; // Clear category
             modalNewProductPriceEl.value = '';
             modalNewProductStockEl.value = '';
             modalNewProductRestockLevelEl.value = '10'; // Reset to default
@@ -2097,9 +2133,9 @@
                 return;
             }
 
-            const currentSubtotal = parseFloat(summarySubtotalEl.textContent.replace('₱', ''));
-            const currentTotal = parseFloat(summaryTotalEl.textContent.replace('₱', ''));
-            const currentDiscountAmount = parseFloat(summaryAppliedDiscountEl.textContent.replace('₱', ''));
+            const currentSubtotal = parseFloat(summarySubtotalEl.textContent.replace('₱', '').replace(/,/g, ''));
+            const currentTotal = parseFloat(summaryTotalEl.textContent.replace('₱', '').replace(/,/g, ''));
+            const currentDiscountAmount = parseFloat(summaryAppliedDiscountEl.textContent.replace('₱', '').replace(/,/g, ''));
 
             const confirmed = await showMessageBox(
                 'Confirm Final Checkout',
@@ -2152,7 +2188,7 @@
                             const newStock = currentStock - cartItem.quantity;
 
                             if (newStock < 0) {
-                                throw new Error(`Insufficient stock for ${cartItem.name}. Available: ${currentStock}, Needed: ${cartItem.quantity}.`);
+                                throw new Error(`Insufficient stock for ${cartItem.name}. Available: ${formatNumber(currentStock)}, Needed: ${formatNumber(cartItem.quantity)}.`);
                             }
                             transaction.update(itemRefs[cartItem.id], { stock: newStock });
                         }
@@ -2372,59 +2408,100 @@
 
             const sortedAggregatedItems = Object.values(aggregatedItems).sort((a, b) => b.totalRevenue - a.totalRevenue);
 
-            // Display aggregated item summary
+            // Display aggregated item summary as a table
             if (sortedAggregatedItems.length === 0) {
                 emptyItemsSummaryMessageEl.classList.remove('hidden');
+                reportItemsSummaryEl.innerHTML = ''; // Ensure no table is rendered if empty
             } else {
                 emptyItemsSummaryMessageEl.classList.add('hidden');
-                sortedAggregatedItems.forEach(item => {
-                    const itemSummaryDiv = document.createElement('div');
-                    itemSummaryDiv.className = `
-                        flex justify-between items-center py-2 border-b border-gray-700 last:border-b-0
+                const summaryTable = document.createElement('table');
+                summaryTable.className = 'w-full table-auto border-collapse border border-gray-600 text-gray-200';
+                summaryTable.innerHTML = `
+                    <thead class="bg-gray-700">
+                        <tr>
+                            <th class="px-4 py-2 text-left border border-gray-600">Item Name</th>
+                            <th class="px-4 py-2 text-right border border-gray-600">Quantity Sold</th>
+                            <th class="px-4 py-2 text-right border border-gray-600">Total Revenue</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                `;
+                const tbody = summaryTable.querySelector('tbody');
+
+                sortedAggregatedItems.forEach((item, index) => {
+                    const row = tbody.insertRow();
+                    row.className = index % 2 === 0 ? 'bg-gray-800' : 'bg-gray-900'; // Zebra stripping
+                    row.innerHTML = `
+                        <td class="px-4 py-2 border border-gray-700 text-left">${item.name}</td>
+                        <td class="px-4 py-2 border border-gray-700 text-right">${formatNumber(item.quantity)}</td>
+                        <td class="px-4 py-2 border border-gray-700 text-right">${formatCurrency(item.totalRevenue)}</td>
                     `;
-                    itemSummaryDiv.innerHTML = `
-                        <span class="text-gray-200">${item.name}</span>
-                        <span class="text-gray-300">Qty: ${item.quantity}</span>
-                        <span class="text-white font-semibold">${formatCurrency(item.totalRevenue)}</span>
-                    `;
-                    reportItemsSummaryEl.appendChild(itemSummaryDiv);
                 });
+                reportItemsSummaryEl.appendChild(summaryTable);
             }
 
-            // Display individual sales in the report details list (optional, can be removed if only aggregated is desired)
-            // For now, keeping it as requested previously, but the main focus is the item summary now.
+            // Display individual sales in the report details list as a table
             if (filteredSales.length === 0) {
-                reportDetailsListEl.innerHTML = '<p class="text-gray-400 text-center py-8">No individual sales data for this period.</p>';
+                emptyDetailsListMessageEl.classList.remove('hidden');
+                reportDetailsListEl.innerHTML = ''; // Ensure no table is rendered if empty
             } else {
-                // Add a header for individual sales logs if there are any
-                reportDetailsListEl.innerHTML = `<h4 class="text-xl font-semibold text-blue-300 mb-4">Individual Sales Logs:</h4>`;
+                emptyDetailsListMessageEl.classList.add('hidden');
+                const detailsTable = document.createElement('table');
+                detailsTable.className = 'w-full table-auto border-collapse border border-gray-600 text-gray-200';
+                detailsTable.innerHTML = `
+                    <thead class="bg-gray-700">
+                        <tr>
+                            <th class="px-4 py-2 text-left border border-gray-600">Invoice ID</th>
+                            <th class="px-4 py-2 text-left border border-gray-600">Date/Time</th>
+                            <th class="px-4 py-2 text-left border border-gray-600">Customer</th>
+                            <th class="px-4 py-2 text-left border border-gray-600">Items Sold</th>
+                            <th class="px-4 py-2 text-right border border-gray-600">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                `;
+                const tbody = detailsTable.querySelector('tbody');
+
                 filteredSales.sort((a, b) => {
                     const dateA = a.timestamp.toDate ? a.timestamp.toDate() : new Date(a.timestamp);
                     const dateB = b.timestamp.toDate ? b.timestamp.toDate() : new Date(b.timestamp);
                     return dateB - dateA;
                 });
 
-                filteredSales.forEach(log => {
+                filteredSales.forEach((log, index) => {
                     const logDate = (log.timestamp.toDate ? log.timestamp.toDate() : new Date(log.timestamp)).toLocaleDateString();
-                    const logTime = (log.timestamp.toDate ? log.timestamp.toDate() : new Date(log.timestamp)).toLocaleTimeString();
+                    const logTime = (log.timestamp.toDate ? log.timestamp.toDate() : new Date(log.timestamp)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                     const isVoided = log.isVoided ? true : false;
                     const voidedClass = isVoided ? 'opacity-70 text-red-300' : '';
 
-                    const logDiv = document.createElement('div');
-                    logDiv.className = `
-                        bg-gray-700 rounded-lg p-3 mb-3 shadow-sm border border-gray-600
-                        flex justify-between items-center text-sm ${voidedClass}
+                    const itemsSoldDetails = log.items.map(item => `${item.name} (x${formatNumber(item.quantity)})`).join(', ');
+
+                    const row = tbody.insertRow();
+                    row.className = `${index % 2 === 0 ? 'bg-gray-800' : 'bg-gray-900'} ${voidedClass}`;
+                    row.innerHTML = `
+                        <td class="px-4 py-2 border border-gray-700 text-left">
+                            <span class="font-semibold text-blue-400 cursor-pointer hover:underline" data-invoice-id="${log.salesInvoiceId}">${log.salesInvoiceId}</span>
+                            ${isVoided ? '<span class="ml-2 px-2 py-1 bg-red-600 text-white text-xs font-bold rounded-full">VOIDED</span>' : ''}
+                        </td>
+                        <td class="px-4 py-2 border border-gray-700 text-left">${logDate} ${logTime}</td>
+                        <td class="px-4 py-2 border border-gray-700 text-left">${log.customer.name}</td>
+                        <td class="px-4 py-2 border border-gray-700 text-left text-sm">${itemsSoldDetails}</td>
+                        <td class="px-4 py-2 border border-gray-700 text-right font-bold text-blue-300">${formatCurrency(log.total)}</td>
                     `;
-                    logDiv.innerHTML = `
-                        <div>
-                            <p class="font-semibold text-white">${log.salesInvoiceId} ${isVoided ? '(VOIDED)' : ''}</p>
-                            <p class="text-gray-300">${logDate} ${logTime}</p>
-                            <p class="text-400">Customer: ${log.customer.name}</p>
-                            ${log.couponApplied ? `<p class="text-xs text-green-300">Coupon: ${log.couponApplied.code} (-${formatCurrency(log.discountAmount)})</p>` : ''}
-                        </div>
-                        <span class="text-lg font-bold text-blue-300">${formatCurrency(log.total)}</span>
-                    `;
-                    reportDetailsListEl.appendChild(logDiv);
+                });
+                reportDetailsListEl.appendChild(detailsTable);
+
+                // Re-add event listeners to the clickable invoice IDs within the new table
+                document.querySelectorAll('#report-details-list .sales-invoice-id').forEach(span => {
+                    span.addEventListener('click', (event) => {
+                        const invoiceId = event.target.dataset.invoiceId;
+                        const selectedLog = salesLogs.find(log => log.salesInvoiceId === invoiceId);
+                        if (selectedLog) {
+                            displayReceiptModal(selectedLog);
+                        } else {
+                            showMessageBox('Error', 'Sales record not found.');
+                        }
+                    });
                 });
             }
         }
@@ -2433,12 +2510,11 @@
          * Downloads the current sales report as a PDF.
          */
         async function generatePdfReport() {
-            // Re-render sales report just before generating PDF to ensure it's up-to-date
-            // based on the selected filter.
+            // Re-render sales report just before generating PDF to ensure it's up-to-date.
             renderSalesReport();
 
             const element = document.getElementById('sales-report-content'); // Target the entire report content area
-            const { jsPDF } = window.jspdf; // Get jsPDF from the UMD bundle
+            const { jsPDF } = window.jspdf;
 
             // Hide buttons that should not appear in the PDF
             const buttonsToHide = [filterDailyBtn, filterWeeklyBtn, filterMonthlyBtn, downloadReportPdfBtn];
@@ -2448,8 +2524,8 @@
                 // Generate canvas from HTML element
                 const canvas = await html2canvas(element, {
                     scale: 2, // Increase scale for better quality
-                    useCORS: true, // Needed if you have images from other domains
-                    logging: false // Disable logging
+                    useCORS: true,
+                    logging: false
                 });
 
                 const imgData = canvas.toDataURL('image/png');
@@ -2458,7 +2534,7 @@
                 const imgHeight = canvas.height * imgWidth / canvas.width;
                 let heightLeft = imgHeight;
 
-                const doc = new jsPDF('p', 'mm', 'a4'); // Portrait, mm units, A4 size
+                const doc = new jsPDF('p', 'mm', 'a4');
                 let position = 0;
 
                 // Add title to the PDF
@@ -2546,7 +2622,7 @@
                         <h3 class="text-xl font-bold text-white">${coupon.code} <span class="text-sm ${statusColor}">(${status})</span></h3>
                         <p class="text-gray-300">${coupon.type === 'fixed' ? formatCurrency(coupon.value) : coupon.value + '%'} Discount</p>
                         <p class="text-gray-400 text-sm">Valid: ${validFromDate.toLocaleDateString()} - ${validUntilDate.toLocaleDateString()}</p>
-                        <p class="text-gray-400 text-sm">Usage: ${coupon.usedCount || 0} / ${coupon.usageLimit === 0 ? 'Unlimited' : coupon.usageLimit}</p>
+                        <p class="text-gray-400 text-sm">Usage: ${formatNumber(coupon.usedCount || 0)} / ${coupon.usageLimit === 0 ? 'Unlimited' : formatNumber(coupon.usageLimit)}</p>
                     </div>
                     ${userRole === 'admin' ? `
                         <div class="flex space-x-2 mt-2 sm:mt-0">
@@ -2697,7 +2773,7 @@
             if (confirmed) {
                 try {
                     const couponDocRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/coupons`, couponId);
-                    await firebase.deleteDoc(docRef);
+                    await firebase.deleteDoc(couponDocRef);
                     showMessageBox('Success', 'Coupon deleted successfully.');
                     // Listener will re-render
                 } catch (error) {
@@ -3124,6 +3200,7 @@
             modalRestockProductContent = document.getElementById('modal-restock-product-content');
 
             modalNewProductNameEl = document.getElementById('modal-new-product-name');
+            modalNewProductCategoryEl = document.getElementById('modal-new-product-category'); // Get category input
             modalNewProductPriceEl = document.getElementById('modal-new-product-price');
             modalNewProductStockEl = document.getElementById('modal-new-product-stock');
             modalNewProductRestockLevelEl = document.getElementById('modal-new-product-restock-level');
@@ -3138,6 +3215,7 @@
             editProductDetailsModalContainer = document.getElementById('edit-product-details-modal-container');
             editProductDetailsModalCloseBtn = document.getElementById('edit-product-details-modal-close-btn');
             editProductNameEl = document.getElementById('edit-product-name');
+            editProductCategoryEl = document.getElementById('edit-product-category'); // Get category input
             editProductPriceEl = document.getElementById('edit-product-price');
             editProductStockEl = document.getElementById('edit-product-stock');
             editProductRestockLevelEl = document.getElementById('edit-product-restock-level');
@@ -3174,6 +3252,7 @@
             reportDetailsListEl = document.getElementById('report-details-list');
             emptyReportMessageEl = document.getElementById('empty-report-message');
             emptyItemsSummaryMessageEl = document.getElementById('empty-items-summary-message');
+            emptyDetailsListMessageEl = document.getElementById('empty-details-list-message'); // Get new element
             downloadReportPdfBtn = document.getElementById('download-report-pdf');
             reportItemsSummaryEl = document.getElementById('report-items-summary');
 
