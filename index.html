@@ -11,6 +11,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <!-- jsPDF-AutoTable for generating tables in PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
+    <!-- Font Awesome for icons (e.g., bell icon) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         /* Custom scrollbar for a metallic look */
         ::-webkit-scrollbar {
@@ -214,9 +216,6 @@
         .notification-item .close-btn:hover {
             opacity: 1;
         }
-        .notification-item.low-stock {
-            background-color: #dc2626; /* Red-600 */
-        }
         .notification-item.new-sale {
             background-color: #16a34a; /* Green-600 */
         }
@@ -229,6 +228,44 @@
         .notification-item.error {
             background-color: #b91c1c; /* Red-700 */
         }
+
+        /* Styles for Notification Bell */
+        #notification-bell-container {
+            position: relative;
+            margin-left: 1.5rem; /* Space from other header elements */
+        }
+
+        #notification-bell {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 1.8rem; /* Larger bell icon */
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 50%;
+            transition: background-color 0.2s;
+        }
+
+        #notification-bell:hover {
+            background-color: #374151; /* Darker gray on hover */
+        }
+
+        #notification-count-badge {
+            position: absolute;
+            top: 0;
+            right: 0;
+            background-color: #ef4444; /* Red-500 */
+            color: white;
+            border-radius: 9999px; /* Full rounded */
+            padding: 0.1rem 0.5rem;
+            font-size: 0.75rem;
+            font-weight: bold;
+            min-width: 1.5rem; /* Ensure it's round even for single digit */
+            text-align: center;
+            transform: translate(50%, -50%); /* Offset to top-right corner */
+            display: none; /* Hidden by default */
+        }
+
     </style>
 
     <!-- Firebase SDK Imports (type="module" is crucial) -->
@@ -278,9 +315,12 @@
                          alt="Garahe ni Hulyo Logo" class="rounded-full w-12 h-12 object-cover">
                     <h1 class="text-3xl font-extrabold text-white">Garahe ni Hulyo POS System</h1>
                 </div>
-                <!-- User ID Display - Hidden as per user request -->
-                <div class="text-sm text-gray-400 mt-2 md:mt-0 hidden">
-                    <span id="user-id-display">Not Logged In</span>
+                <!-- Notification Bell Icon -->
+                <div id="notification-bell-container">
+                    <button id="notification-bell" title="View Low Stock Items">
+                        <i class="fas fa-bell"></i>
+                    </button>
+                    <span id="notification-count-badge" class="hidden">0</span>
                 </div>
             </header>
 
@@ -588,6 +628,23 @@
     <!-- Notification Container -->
     <div id="notification-container">
         <!-- Notifications will be appended here -->
+    </div>
+
+    <!-- Low Stock Notification Modal -->
+    <div id="low-stock-modal-container" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50">
+        <div class="bg-gray-800 p-6 rounded-lg shadow-xl border border-gray-700 w-full max-w-md max-h-[80vh] flex flex-col">
+            <div class="flex justify-between items-center border-b border-gray-700 pb-4 mb-4">
+                <h2 class="text-2xl font-bold text-white">Low Stock Items</h2>
+                <button id="low-stock-modal-close-btn"
+                        class="text-gray-400 hover:text-white text-3xl leading-none font-semibold">
+                    &times;
+                </button>
+            </div>
+            <div id="low-stock-list" class="flex-1 overflow-y-auto pr-2">
+                <!-- Low stock items will be rendered here -->
+                <p class="text-gray-400 text-center py-8" id="empty-low-stock-message">No items currently low on stock.</p>
+            </div>
+        </div>
     </div>
 
     <!-- Login Modal -->
@@ -929,14 +986,13 @@
         let salesLogs = []; // Fetched from Firestore
         let coupons = [];   // New: Fetched from Firestore for coupon management
         let users = []; // New: Fetched from Firestore for user management
+        let lowStockItems = []; // New: Array to hold items currently low on stock
 
         const TAX_RATE = 0; // Changed to 0 as per request
         let salesInvoiceCounter = 1001; // Will be determined by existing Firestore sales log IDs
         let currentReportFilter = 'daily'; // Default filter for sales report
         let appliedCoupon = null; // New: Stores the currently applied coupon object
 
-        // Notification management
-        const notifiedLowStockItems = new Set(); // Stores product IDs that have already triggered a low stock notification
 
         // --- DOM Elements (Declared with 'let' and assigned inside window.onload) ---
         let appContentWrapperEl; // New wrapper element
@@ -946,6 +1002,8 @@
         let reportLogsContentEl, salesLogListEl, emptyLogsMessageEl, inventoryLoadingEl, salesLogLoadingEl, userIdDisplayEl;
         let messageBoxContainerEl, messageBoxTitleEl, messageBoxTextEl, messageBoxOkBtn, messageBoxCancelBtn;
         let notificationContainerEl; // New: Notification container
+        let notificationBellEl, notificationCountBadgeEl; // New: Notification bell elements
+        let lowStockModalContainerEl, lowStockModalCloseBtn, lowStockListEl, emptyLowStockMessageEl; // New: Low stock modal elements
         let manageProductModalContainer, manageProductModalCloseBtn;
         let modalTabAddProductBtn, modalTabRestockProductBtn;
         let modalAddProductContent, modalRestockProductContent;
@@ -1032,11 +1090,11 @@
         /**
          * Displays a non-blocking notification toast.
          * @param {string} message - The message to display.
-         * @param {string} type - 'info', 'success', 'error', 'low-stock', 'new-sale'
-         * @param {number} [duration=5000] - Duration in milliseconds before auto-dismissing. 0 for permanent.
-         * @returns {HTMLElement} The created notification element.
+         * @param {string} type - 'info', 'success', 'error', 'new-sale'
+         * @param {number} [duration=3000] - Duration in milliseconds before auto-dismissing. 0 for permanent.
+         * Default changed to 3000ms for faster disappearance.
          */
-        function showNotification(message, type = 'info', duration = 5000) {
+        function showNotification(message, type = 'info', duration = 3000) {
             const notificationDiv = document.createElement('div');
             notificationDiv.className = `notification-item ${type}`;
             notificationDiv.innerHTML = `
@@ -1060,7 +1118,6 @@
             if (duration > 0) {
                 setTimeout(dismiss, duration);
             }
-            return notificationDiv;
         }
 
 
@@ -1096,10 +1153,10 @@
             const sortedItems = [...filteredAndCategorizedItems].sort((a, b) => a.name.localeCompare(b.name));
 
             sortedItems.forEach(item => {
-                // Calculate effective stock considering items already in cart
+                // Calculate effective stock considering items already in cart for ADD button logic
                 const itemInCart = cart.find(cartItem => cartItem.id === item.id);
                 const quantityInCart = itemInCart ? itemInCart.quantity : 0;
-                const effectiveAvailableStock = item.stock - quantityInCart;
+                const availableForAdding = item.stock - quantityInCart; // This is for the button's disabled state
 
                 const itemDiv = document.createElement('div');
                 itemDiv.className = `
@@ -1115,7 +1172,7 @@
                         <div>
                             <h3 class="text-lg font-semibold text-blue-300">${item.name}</h3>
                             <p class="text-sm text-gray-400">Category: <span class="font-medium text-gray-200">${item.category || 'N/A'}</span></p>
-                            <p class="text-sm text-gray-400">Stock: <span class="font-medium text-gray-200">${formatNumber(effectiveAvailableStock)}</span></p>
+                            <p class="text-sm text-gray-400">Stock: <span class="font-medium text-gray-200">${formatNumber(item.stock)}</span></p> <!-- Display actual stock -->
                         </div>
                     </div>
                     <div class="flex items-center space-x-3">
@@ -1123,8 +1180,8 @@
                         <button data-item-id="${item.id}"
                                 class="add-to-cart-btn px-3 py-1 bg-blue-600 text-white rounded-lg
                                        hover:bg-blue-700 active:bg-blue-800 transition duration-200
-                                       shadow-md text-sm ${effectiveAvailableStock <= 0 ? 'opacity-50 cursor-not-allowed' : ''}"
-                                ${effectiveAvailableStock <= 0 ? 'disabled' : ''}>
+                                       shadow-md text-sm ${availableForAdding <= 0 ? 'opacity-50 cursor-not-allowed' : ''}"
+                                ${availableForAdding <= 0 ? 'disabled' : ''}>
                             Add
                         </button>
                     </div>
@@ -1283,7 +1340,7 @@
                 couponCodeInputEl.value = ''; // Clear coupon input field
                 couponStatusMessageEl.textContent = ''; // Clear coupon status message
                 renderCart(); // Re-render the cart UI
-                showNotification('Cart Cleared', 'info', 3000);
+                showNotification('Cart Cleared', 'info', 2000); // Faster disappearance
             }
         }
 
@@ -1854,7 +1911,7 @@
                 modalImagePreviewEl.src = ''; // Clear preview
                 modalImagePreviewEl.classList.add('hidden'); // Hide preview
 
-                showNotification('Product Added', 'success', 3000);
+                showNotification('Product Added', 'success', 2000); // Faster disappearance
                 closeManageProductModal();
             } catch (error) {
                 console.error("Error adding new product to Firestore:", error);
@@ -1893,7 +1950,7 @@
             if (restockedCount > 0) {
                 try {
                     await Promise.all(updates); // Execute all updates concurrently
-                    showNotification(`Successfully restocked ${restockedCount} product(s) with a total of ${formatNumber(totalRestockedUnits)} units.`, 'success', 4000);
+                    showNotification(`Successfully restocked ${restockedCount} product(s) with a total of ${formatNumber(totalRestockedUnits)} units.`, 'success', 3000); // Faster disappearance
                     closeManageProductModal();
                 } catch (error) {
                     console.error("Error applying restock:", error);
@@ -2023,7 +2080,7 @@
                 const docRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/inventory`, itemId);
                 await firebase.updateDoc(docRef, updatedProductData);
 
-                showNotification(`${name} updated successfully.`, 'success', 3000);
+                showNotification(`${name} updated successfully.`, 'success', 2000); // Faster disappearance
                 closeEditProductDetailsModal();
             } catch (error) {
                 console.error("Error updating product:", error);
@@ -2053,7 +2110,7 @@
                     // Use currentAppId for the Firestore path
                     const docRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/inventory`, itemId);
                     await firebase.deleteDoc(docRef);
-                    showNotification('Product deleted successfully.', 'success', 3000);
+                    showNotification('Product deleted successfully.', 'success', 2000); // Faster disappearance
                 } catch (error) {
                     console.error("Error deleting product:", error);
                     showMessageBox('Error', 'Failed to delete product. Please try again.');
@@ -3145,7 +3202,7 @@
             try {
                 // Add coupon to Firestore, letting Firestore auto-generate ID
                 const docRef = await firebase.addDoc(firebase.collection(db, `artifacts/${currentAppId}/public/data/coupons`), newCoupon);
-                showNotification(`Coupon "${code}" created successfully!`, 'success', 3000);
+                showNotification(`Coupon "${code}" created successfully!`, 'success', 2000); // Faster disappearance
 
                 // Clear form
                 newCouponCodeEl.value = '';
@@ -3187,7 +3244,7 @@
                 try {
                     const couponDocRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/coupons`, couponId);
                     await firebase.updateDoc(couponDocRef, { isActive: newStatus });
-                    showNotification(`Coupon "${couponToToggle.code}" is now ${newStatus ? 'active' : 'inactive'}.`, 'info', 3000);
+                    showNotification(`Coupon "${couponToToggle.code}" is now ${newStatus ? 'active' : 'inactive'}.`, 'info', 2000); // Faster disappearance
                     // Listener will re-render
                 } catch (error) {
                     console.error("Error toggling coupon status:", error);
@@ -3216,7 +3273,7 @@
                 try {
                     const couponDocRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/coupons`, couponId);
                     await firebase.deleteDoc(couponDocRef);
-                    showNotification('Coupon deleted successfully.', 'success', 3000);
+                    showNotification('Coupon deleted successfully.', 'success', 2000); // Faster disappearance
                     // Listener will re-render
                 } catch (error) {
                     console.error("Error deleting coupon:", error);
@@ -3282,7 +3339,7 @@
             couponStatusMessageEl.textContent = `Coupon "${foundCoupon.code}" applied!`;
             appliedDiscountDisplayRowEl.classList.remove('hidden'); // Show discount row
             calculateTotals();
-            showNotification(`Coupon "${foundCoupon.code}" applied!`, 'success', 3000);
+            showNotification(`Coupon "${foundCoupon.code}" applied!`, 'success', 2000); // Faster disappearance
         }
 
         // --- User Management Functions ---
@@ -3425,7 +3482,7 @@
                 try {
                     const userDocRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/users`, id);
                     await firebase.updateDoc(userDocRef, { role: newRole });
-                    showNotification(`Role for "${userEmail}" updated to "${newRole}" successfully.`, 'success', 3000);
+                    showNotification(`Role for "${userEmail}" updated to "${newRole}" successfully.`, 'success', 2000); // Faster disappearance
                     closeEditUserRoleModal();
                 } catch (error) {
                     console.error("Error updating user role:", error);
@@ -3464,13 +3521,61 @@
                 try {
                     const userDocRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/users`, id);
                     await firebase.deleteDoc(userDocRef);
-                    showNotification(`User "${email}" role deleted successfully.`, 'success', 3000);
+                    showNotification(`User "${email}" role deleted successfully.`, 'success', 2000); // Faster disappearance
                     // Listener will re-render the user list
                 } catch (error) {
                     console.error("Error deleting user role:", error);
                     showMessageBox('Error', `Failed to delete user role: ${error.message || 'Please try again.'}`);
                 }
             }
+        }
+
+        /**
+         * Renders the low stock items in the low stock modal.
+         */
+        function renderLowStockModal() {
+            lowStockListEl.innerHTML = ''; // Clear existing items
+
+            if (lowStockItems.length === 0) {
+                emptyLowStockMessageEl.classList.remove('hidden');
+                return;
+            } else {
+                emptyLowStockMessageEl.classList.add('hidden');
+            }
+
+            // Sort low stock items by name
+            const sortedLowStockItems = [...lowStockItems].sort((a, b) => a.name.localeCompare(b.name));
+
+            sortedLowStockItems.forEach(item => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = `
+                    bg-gray-700 rounded-lg p-4 mb-3 shadow-sm border border-red-500
+                    flex flex-col sm:flex-row justify-between items-center
+                `;
+                itemDiv.innerHTML = `
+                    <div class="flex-1 text-left mb-2 sm:mb-0">
+                        <h3 class="text-xl font-semibold text-red-300">${item.name}</h3>
+                        <p class="text-gray-300">Current Stock: <span class="font-bold">${formatNumber(item.stock)}</span></p>
+                        <p class="text-gray-400 text-sm">Restock Level: ${formatNumber(item.restockLevel || 0)}</p>
+                    </div>
+                `;
+                lowStockListEl.appendChild(itemDiv);
+            });
+        }
+
+        /**
+         * Opens the low stock modal.
+         */
+        function openLowStockModal() {
+            renderLowStockModal(); // Render content every time it's opened
+            lowStockModalContainerEl.classList.remove('hidden');
+        }
+
+        /**
+         * Closes the low stock modal.
+         */
+        function closeLowStockModal() {
+            lowStockModalContainerEl.classList.add('hidden');
         }
 
 
@@ -3503,26 +3608,34 @@
             masterListLoadingEl.classList.remove('hidden'); // Also show loading for master list
             inventoryUnsubscribe = firebase.onSnapshot(inventoryCollectionRef, async (snapshot) => {
                 const fetchedInventory = [];
+                const currentLowStock = []; // Temp array for low stock items
                 snapshot.forEach(doc => {
-                    fetchedInventory.push({ id: doc.id, ...doc.data() });
-                });
-                inventory = fetchedInventory; // Update global inventory array
-
-                // Check for low stock notifications
-                inventory.forEach(item => {
-                    if (item.stock <= item.restockLevel && item.stock > 0 && !notifiedLowStockItems.has(item.id)) {
-                        showNotification(`Low Stock Alert: ${item.name} is at ${formatNumber(item.stock)} units!`, 'low-stock', 0); // Permanent notification
-                        notifiedLowStockItems.add(item.id); // Mark as notified
-                    } else if (item.stock > item.restockLevel && notifiedLowStockItems.has(item.id)) {
-                        // If stock recovered, remove from notified list
-                        notifiedLowStockItems.delete(item.id);
+                    const itemData = { id: doc.id, ...doc.data() };
+                    fetchedInventory.push(itemData);
+                    // Check for low stock for bell notification
+                    if (itemData.stock <= itemData.restockLevel && itemData.stock > 0) {
+                        currentLowStock.push(itemData);
                     }
                 });
+                inventory = fetchedInventory; // Update global inventory array
+                lowStockItems = currentLowStock; // Update global low stock items
 
+                // Update notification bell badge
+                if (lowStockItems.length > 0) {
+                    notificationCountBadgeEl.textContent = lowStockItems.length;
+                    notificationCountBadgeEl.classList.remove('hidden');
+                } else {
+                    notificationCountBadgeEl.classList.add('hidden');
+                }
 
                 populateCategoryFilter(); // Populate category filter when inventory updates
                 renderInventory(getFilteredInventory()); // Re-render current view with new data
                 renderMasterList(getFilteredMasterList()); // Re-render master list with new data
+                // Also re-render low stock modal if it's open
+                if (!lowStockModalContainerEl.classList.contains('hidden')) {
+                    renderLowStockModal();
+                }
+
                 inventoryLoadingEl.classList.add('hidden');
                 masterListLoadingEl.classList.add('hidden');
 
@@ -3872,7 +3985,7 @@
             emptyLogsMessageEl = document.getElementById('empty-logs-message');
             inventoryLoadingEl = document.getElementById('inventory-loading');
             salesLogLoadingEl = document.getElementById('sales-log-loading');
-            userIdDisplayEl = document.getElementById('user-id-display');
+            // userIdDisplayEl = document.getElementById('user-id-display'); // Removed as per user request
 
             messageBoxContainerEl = document.getElementById('message-box-container');
             messageBoxTitleEl = document.getElementById('message-box-title');
@@ -3881,6 +3994,13 @@
             messageBoxCancelBtn = document.getElementById('message-box-cancel');
 
             notificationContainerEl = document.getElementById('notification-container'); // Get notification container
+            notificationBellEl = document.getElementById('notification-bell'); // Get bell icon
+            notificationCountBadgeEl = document.getElementById('notification-count-badge'); // Get badge
+            lowStockModalContainerEl = document.getElementById('low-stock-modal-container'); // Get low stock modal
+            lowStockModalCloseBtn = document.getElementById('low-stock-modal-close-btn'); // Get low stock modal close button
+            lowStockListEl = document.getElementById('low-stock-list'); // Get low stock list
+            emptyLowStockMessageEl = document.getElementById('empty-low-stock-message'); // Get empty low stock message
+
 
             manageProductModalContainer = document.getElementById('manage-product-modal-container');
             manageProductModalCloseBtn = document.getElementById('manage-product-modal-close-btn');
@@ -4083,10 +4203,11 @@
                         salesLogs = [];
                         coupons = []; // Clear coupons
                         users = []; // Clear users
+                        lowStockItems = []; // Clear low stock items on logout
+                        notificationCountBadgeEl.classList.add('hidden'); // Hide badge
                         appliedCoupon = null; // Clear applied coupon
                         couponCodeInputEl.value = ''; // Clear coupon input
                         couponStatusMessageEl.textContent = ''; // Clear coupon message
-                        notifiedLowStockItems.clear(); // Clear low stock notifications on logout
                         renderInventory();
                         renderCart();
                         renderReportLogs();
@@ -4225,6 +4346,10 @@
             addNewUserBtnEl.addEventListener('click', addNewUser);
             editUserRoleModalCloseBtn.addEventListener('click', closeEditUserRoleModal); // Close user role edit modal
             saveUserRoleBtn.addEventListener('click', saveEditedUserRole); // Save user role
+
+            // Notification Bell listeners
+            notificationBellEl.addEventListener('click', openLowStockModal);
+            lowStockModalCloseBtn.addEventListener('click', closeLowStockModal);
 
             // Initial renders (these will be empty/default until login occurs and data loads)
             renderCart();
