@@ -491,7 +491,7 @@
                             </button>
                         </div>
                         <p id="coupon-status-message" class="text-xs mt-2 text-gray-400"></p>
-                        <div class="flex justify-between items-center mt-2" id="applied-discount-display-row">
+                        <div class="flex justify-between items-center mt-2 hidden" id="applied-discount-display-row">
                             <span class="text-md text-gray-300">Discount:</span>
                             <span id="applied-discount" class="text-lg font-semibold text-green-400">₱0.00</span>
                         </div>
@@ -504,6 +504,13 @@
                                    rounded-lg shadow-lg transform transition duration-200 hover:scale-105
                                    focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800">
                         Process Sale
+                    </button>
+                    <!-- Clear Cart Button -->
+                    <button id="clear-cart-button"
+                            class="w-full py-3 bg-gray-600 hover:bg-gray-700 active:bg-gray-800 text-white font-bold
+                                   rounded-lg shadow-lg transform transition duration-200 hover:scale-105 mt-2
+                                   focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-800">
+                        Clear Cart
                     </button>
                 </div>
             </div>
@@ -853,13 +860,6 @@
         let userRole = 'guest'; // Default role, 'guest' means not logged in
         let isFirebaseReady = false;
 
-        // Global variables to temporarily store admin credentials for re-login after creating a new user.
-        // WARNING: Storing user passwords in client-side variables is a security risk.
-        // For production, consider using Firebase Cloud Functions with Admin SDK for user creation.
-        let _adminEmail = null;
-        let _adminPassword = null;
-
-
         // Data Models - These will now be synchronized with Firestore
         let inventory = []; // Fetched from Firestore
         let cart = []; // Still in-memory for current transaction
@@ -875,7 +875,7 @@
 
         // --- DOM Elements (Declared with 'let' and assigned inside window.onload) ---
         let appContentWrapperEl; // New wrapper element
-        let inventoryListEl, cartListEl, emptyCartMessageEl, subtotalEl, totalEl, inventorySearchEl, checkoutButtonEl;
+        let inventoryListEl, cartListEl, emptyCartMessageEl, subtotalEl, totalEl, inventorySearchEl, checkoutButtonEl, clearCartButtonEl; // Added clearCartButtonEl
         let tabInventoryBtn, tabManageProductsBtn, tabInventoryMasterBtn, tabReportLogsBtn, tabSalesReportBtn, tabUserManagementBtn, tabCouponManagementBtn; // Added coupon tab
         let inventoryContentEl, inventoryMasterContentEl, masterListEl, masterListSearchEl, masterListLoadingEl;
         let reportLogsContentEl, salesLogListEl, emptyLogsMessageEl, inventoryLoadingEl, salesLogLoadingEl, userIdDisplayEl;
@@ -1081,6 +1081,8 @@
                 emptyCartMessageEl.classList.remove('hidden');
                 checkoutButtonEl.disabled = true;
                 checkoutButtonEl.classList.add('opacity-50', 'cursor-not-allowed');
+                clearCartButtonEl.disabled = true; // Disable clear cart button
+                clearCartButtonEl.classList.add('opacity-50', 'cursor-not-allowed');
                 appliedCoupon = null; // Clear applied coupon if cart is empty
                 couponCodeInputEl.value = '';
                 couponStatusMessageEl.textContent = '';
@@ -1092,6 +1094,8 @@
                 emptyCartMessageEl.classList.add('hidden'); // Hide empty message if items exist
                 checkoutButtonEl.disabled = false;
                 checkoutButtonEl.classList.remove('opacity-50', 'cursor-not-allowed');
+                clearCartButtonEl.disabled = false; // Enable clear cart button
+                clearCartButtonEl.classList.remove('opacity-50', 'cursor-not-allowed');
                 // Show discount row only if a coupon is applied
                 if (appliedCoupon) {
                     appliedDiscountDisplayRowEl.classList.remove('hidden');
@@ -1150,6 +1154,37 @@
             calculateTotals();
             renderInventory(getFilteredInventory()); // Re-render inventory to reflect changes in available stock
         }
+
+        /**
+         * Clears all items from the cart.
+         */
+        async function clearCart() {
+            if (!isFirebaseReady || !auth.currentUser) {
+                showMessageBox('Login Required', 'Please log in to clear the cart.');
+                return;
+            }
+
+            if (cart.length === 0) {
+                showMessageBox('Cart Empty', 'Your cart is already empty.');
+                return;
+            }
+
+            const confirmed = await showMessageBox(
+                'Confirm Clear Cart',
+                'Are you sure you want to clear all items from the cart?',
+                true
+            );
+
+            if (confirmed) {
+                cart = []; // Clear the cart array
+                appliedCoupon = null; // Clear any applied coupon
+                couponCodeInputEl.value = ''; // Clear coupon input field
+                couponStatusMessageEl.textContent = ''; // Clear coupon status message
+                renderCart(); // Re-render the cart UI
+                showMessageBox('Cart Cleared', 'All items have been removed from the cart.');
+            }
+        }
+
 
         /**
          * Renders the inventory master list for editing and deletion.
@@ -1663,8 +1698,24 @@
             const stock = parseInt(modalNewProductStockEl.value);
             const restockLevel = parseInt(modalNewProductRestockLevelEl.value);
 
-            if (!name || !category || isNaN(price) || price <= 0 || isNaN(stock) || stock < 0 || isNaN(restockLevel) || restockLevel < 0) {
-                showMessageBox('Input Error', 'Please enter valid product name, category, price (>0), stock (>=0), and restock level (>=0).');
+            if (!name) {
+                showMessageBox('Input Error', 'Product Name cannot be empty.');
+                return;
+            }
+            if (!category) {
+                showMessageBox('Input Error', 'Category cannot be empty.');
+                return;
+            }
+            if (isNaN(price) || price <= 0) {
+                showMessageBox('Input Error', 'Please enter a valid price greater than 0.');
+                return;
+            }
+            if (isNaN(stock) || stock < 0) {
+                showMessageBox('Input Error', 'Please enter a valid initial stock (0 or greater).');
+                return;
+            }
+            if (isNaN(restockLevel) || restockLevel < 0) {
+                showMessageBox('Input Error', 'Please enter a valid restock level (0 or greater).');
                 return;
             }
 
@@ -1839,8 +1890,24 @@
             const stock = parseInt(editProductStockEl.value);
             const restockLevel = parseInt(editProductRestockLevelEl.value);
 
-            if (!name || !category || isNaN(price) || price <= 0 || isNaN(stock) || stock < 0 || isNaN(restockLevel) || restockLevel < 0) {
-                showMessageBox('Input Error', 'Please enter valid product name, category, price (>0), stock (>=0), and restock level (>=0).');
+            if (!name) {
+                showMessageBox('Input Error', 'Product Name cannot be empty.');
+                return;
+            }
+            if (!category) {
+                showMessageBox('Input Error', 'Category cannot be empty.');
+                return;
+            }
+            if (isNaN(price) || price <= 0) {
+                showMessageBox('Input Error', 'Please enter a valid price greater than 0.');
+                return;
+            }
+            if (isNaN(stock) || stock < 0) {
+                showMessageBox('Input Error', 'Please enter a valid current stock (0 or greater).');
+                return;
+            }
+            if (isNaN(restockLevel) || restockLevel < 0) {
+                showMessageBox('Input Error', 'Please enter a valid restock level (0 or greater).');
                 return;
             }
 
@@ -2789,7 +2856,7 @@
                 return dateB - dateA; // Newest first
             });
 
-            salesLogsData.forEach(log => {
+            salesForDetailedReport.forEach(log => { // Corrected from `salesLogsData.forEach(log =>`
                 const logDate = (log.timestamp.toDate ? log.timestamp.toDate() : new Date(log.timestamp)).toLocaleDateString();
                 const logTime = (log.timestamp.toDate ? log.timestamp.toDate() : new Date(log.timestamp)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 const itemsSoldDetails = log.items.map(item => `${item.name} (x${formatNumber(item.quantity)})`).join(', ');
@@ -2944,16 +3011,36 @@
             const usageLimit = parseInt(newCouponUsageLimitEl.value);
 
             // Basic Validation
-            if (!code || !type || isNaN(value) || value <= 0 || !validFrom || !validUntil || isNaN(usageLimit) || usageLimit < 0) {
-                showMessageBox('Input Error', 'Please fill in all coupon fields with valid values.');
+            if (!code) {
+                showMessageBox('Input Error', 'Coupon Code cannot be empty.');
+                return;
+            }
+            if (!type) {
+                showMessageBox('Input Error', 'Discount Type cannot be empty.');
+                return;
+            }
+            if (isNaN(value) || value <= 0) {
+                showMessageBox('Input Error', 'Please enter a valid Discount Value greater than 0.');
                 return;
             }
             if (type === 'percentage' && value > 100) {
                 showMessageBox('Input Error', 'Percentage discount cannot exceed 100%.');
                 return;
             }
+            if (!validFrom) {
+                showMessageBox('Input Error', '"Valid From" date cannot be empty.');
+                return;
+            }
+            if (!validUntil) {
+                showMessageBox('Input Error', '"Valid Until" date cannot be empty.');
+                return;
+            }
             if (new Date(validFrom) > new Date(validUntil)) {
                 showMessageBox('Input Error', '"Valid From" date cannot be after "Valid Until" date.');
+                return;
+            }
+            if (isNaN(usageLimit) || usageLimit < 0) {
+                showMessageBox('Input Error', 'Please enter a valid Usage Limit (0 for unlimited).');
                 return;
             }
             if (coupons.some(c => c.code === code)) {
@@ -3407,6 +3494,7 @@
                         appliedCoupon = null;
                         couponCodeInputEl.value = '';
                         couponStatusMessageEl.textContent = 'Applied coupon is no longer valid.';
+                        appliedDiscountDisplayRowEl.classList.add('hidden'); // Hide discount row
                         calculateTotals(); // Recalculate if coupon became invalid
                     } else {
                         // If still valid, update the appliedCoupon object in case its state changed
@@ -3532,18 +3620,6 @@
             try {
                 const userCredential = await firebase.signInWithEmailAndPassword(auth, email, password);
                 // Auth state listener will handle updating UI and userRole
-                // If the logged-in user is an admin, store their credentials temporarily
-                // for the scenario where they create a new user and need to re-login.
-                if (userCredential.user) {
-                     // Check if the user is an admin after successful login
-                    const userDocRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/users`, userCredential.user.uid);
-                    const userDocSnap = await firebase.getDoc(userDocRef);
-                    if (userDocSnap.exists() && userDocSnap.data().role === 'admin') {
-                        _adminEmail = email;
-                        _adminPassword = password;
-                    }
-                }
-
                 showMessageBox('Login Success', `Welcome, ${userCredential.user.email}!`);
             } catch (error) {
                 console.error("Login error:", error);
@@ -3570,9 +3646,6 @@
                 try {
                     await firebase.signOut(auth);
                     showMessageBox('Logout Success', 'You have been logged out.');
-                    // Clear any stored admin credentials on logout
-                    _adminEmail = null;
-                    _adminPassword = null;
                     // onAuthStateChanged will handle role and UI update and showing login modal
                 } catch (error) {
                     console.error("Logout error:", error);
@@ -3583,6 +3656,11 @@
 
         /**
          * Adds a new user to Firebase Authentication and sets their role in Firestore.
+         * IMPORTANT: In a real production app, user creation by an admin should be handled
+         * via a secure backend (e.g., Firebase Cloud Functions with Admin SDK) to prevent
+         * exposing admin credentials or session changes on the client side.
+         * This client-side implementation will cause the current admin user to be signed out
+         * and the newly created user to be signed in. The admin will need to re-login.
          */
         async function addNewUser() {
             if (!isFirebaseReady || userRole !== 'admin') {
@@ -3605,9 +3683,6 @@
             }
 
             try {
-                // Store current admin's UID before creating new user, as auth.currentUser will change
-                const currentAdminUid = auth.currentUser ? auth.currentUser.uid : null;
-
                 // Create user in Firebase Authentication
                 const newUserCredential = await firebase.createUserWithEmailAndPassword(auth, email, password);
                 const newUid = newUserCredential.user.uid;
@@ -3620,17 +3695,7 @@
                     createdAt: firebase.serverTimestamp()
                 });
 
-                // IMPORTANT: Re-login the original admin user after new user creation.
-                // This addresses the issue where `createUserWithEmailAndPassword` automatically signs in the new user.
-                // WARNING: This approach requires temporarily holding the admin's password in client-side memory.
-                // For a production application, consider using Firebase Cloud Functions with Admin SDK
-                // to create users without changing the client's current authentication state.
-                if (_adminEmail && _adminPassword) {
-                    await firebase.signInWithEmailAndPassword(auth, _adminEmail, _adminPassword);
-                    showMessageBox('User Added', `User "${email}" added successfully. You have been re-logged in as admin.`);
-                } else {
-                    showMessageBox('User Added', `User "${email}" added successfully. Please manually log back in as admin if your session changed.`);
-                }
+                showMessageBox('User Added', `User "${email}" added successfully. Please note: The current admin session has been replaced by the new user. You may need to manually re-login as admin.`);
 
                 // Clear form
                 newUserEmailEl.value = '';
@@ -3677,6 +3742,7 @@
             totalEl = document.getElementById('total');
             inventorySearchEl = document.getElementById('inventory-search');
             checkoutButtonEl = document.getElementById('checkout-button');
+            clearCartButtonEl = document.getElementById('clear-cart-button'); // Get the new clear cart button
             emptyInventoryMessageEl = document.getElementById('empty-inventory-message'); // Get new element
             categoryFilterEl = document.getElementById('category-filter'); // Get new category filter
 
@@ -3941,6 +4007,7 @@
             });
 
             checkoutButtonEl.addEventListener('click', initiateCheckout);
+            clearCartButtonEl.addEventListener('click', clearCart); // New: Clear Cart button listener
 
             // Main Tab button event listeners
             tabInventoryBtn.addEventListener('click', () => switchMainTab('inventory'));
