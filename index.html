@@ -1460,7 +1460,7 @@
                         <div>
                             <h3 class="text-xl font-semibold text-blue-300">${item.name}</h3>
                             <p class="text-gray-400">Category: <span class="font-medium text-gray-200">${item.category || 'N/A'}</span></p>
-                            <p class="text-gray-400">Current Stock: <span class="font-medium text-gray-200">${formatNumber(item.stock)}</span></p>
+                            <p class="text-400">Current Stock: <span class="font-medium text-gray-200">${formatNumber(item.stock)}</span></p>
                             <p class="text-gray-500 text-sm">Restock Level: <span class="font-medium text-gray-400">${formatNumber(item.restockLevel || 0)}</span></p>
                         </div>
                     </div>
@@ -3883,8 +3883,10 @@
          * and the newly created user to be signed in. The admin will need to re-login.
          */
         async function addNewUser() {
+            console.log("Attempting to add new user. Current userRole:", userRole, "Current userId:", userId); // Added for debugging
+
             if (!isFirebaseReady || userRole !== 'admin') {
-                showMessageBox('Access Denied', 'You do not have permission to add new users.');
+                showMessageBox('Access Denied', 'You do not have permission to add new users. Only administrators can perform this action.'); // More specific message
                 return;
             }
 
@@ -3906,14 +3908,17 @@
                 // Create user in Firebase Authentication
                 const newUserCredential = await firebase.createUserWithEmailAndPassword(auth, email, password);
                 const newUid = newUserCredential.user.uid;
+                console.log("User created in Firebase Auth with UID:", newUid); // Debugging
 
                 // Set user role in Firestore
                 // Use currentAppId for the Firestore path
-                await firebase.setDoc(firebase.doc(db, `artifacts/${currentAppId}/public/data/users`, newUid), {
+                const userDocRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/users`, newUid);
+                await firebase.setDoc(userDocRef, {
                     email: email,
                     role: role,
                     createdAt: firebase.serverTimestamp()
                 });
+                console.log("User role document created in Firestore for UID:", newUid); // Debugging
 
                 showNotification(`User "${email}" added successfully! Admin session changed. Please re-login.`, 'info', 7000);
 
@@ -3932,6 +3937,8 @@
                     errorMessage = 'The password is too weak. Please choose a stronger password.';
                 } else if (error.code === 'auth/network-request-failed') {
                     errorMessage = 'Network error. Please check your internet connection.';
+                } else if (error.code === 'permission-denied') { // Catch Firestore permission errors specifically
+                    errorMessage = 'Permission denied. Ensure your Firebase Security Rules allow this operation for your current user role.';
                 }
                 showMessageBox('User Add Error', errorMessage);
             }
