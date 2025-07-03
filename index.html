@@ -173,6 +173,62 @@
                 box-shadow: none;
             }
         }
+
+        /* Notification styles */
+        #notification-container {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            max-width: 300px;
+        }
+        .notification-item {
+            background-color: #333;
+            color: white;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+            opacity: 0;
+            transform: translateY(-20px);
+        }
+        .notification-item.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .notification-item .close-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.2rem;
+            cursor: pointer;
+            margin-left: 1rem;
+            opacity: 0.7;
+        }
+        .notification-item .close-btn:hover {
+            opacity: 1;
+        }
+        .notification-item.low-stock {
+            background-color: #dc2626; /* Red-600 */
+        }
+        .notification-item.new-sale {
+            background-color: #16a34a; /* Green-600 */
+        }
+        .notification-item.info {
+            background-color: #2563eb; /* Blue-600 */
+        }
+        .notification-item.success {
+            background-color: #059669; /* Emerald-600 */
+        }
+        .notification-item.error {
+            background-color: #b91c1c; /* Red-700 */
+        }
     </style>
 
     <!-- Firebase SDK Imports (type="module" is crucial) -->
@@ -529,6 +585,11 @@
         </div>
     </div>
 
+    <!-- Notification Container -->
+    <div id="notification-container">
+        <!-- Notifications will be appended here -->
+    </div>
+
     <!-- Login Modal -->
     <div id="login-modal-container" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50">
         <div class="bg-gray-800 p-8 rounded-lg shadow-xl border border-gray-700 w-96">
@@ -603,9 +664,10 @@
                                   focus:outline-none focus:ring-2 focus:ring-blue-600 transition duration-200">
                 </div>
                 <div class="mb-6">
-                    <label for="modal-new-product-image" class="block text-gray-300 text-sm font-bold mb-2">Product Image:</label>
-                    <input type="file" id="modal-new-product-image" accept="image/*"
-                           class="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 placeholder-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer">
+                    <label for="modal-new-product-image-url" class="block text-gray-300 text-sm font-bold mb-2">Product Image URL:</label>
+                    <input type="url" id="modal-new-product-image-url" placeholder="https://example.com/image.jpg"
+                           class="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 placeholder-gray-500
+                                  focus:outline-none focus:ring-2 focus:ring-blue-600 transition duration-200">
                     <div class="mt-4 flex justify-center">
                         <img id="modal-image-preview" class="max-w-full max-h-48 rounded-md border border-gray-700 object-contain hidden" alt="Image Preview">
                     </div>
@@ -682,9 +744,10 @@
                                   focus:outline-none focus:ring-2 focus:ring-blue-600 transition duration-200">
                 </div>
                 <div class="mb-6">
-                    <label for="edit-product-image" class="block text-gray-300 text-sm font-bold mb-2">Product Image:</label>
-                    <input type="file" id="edit-product-image" accept="image/*"
-                           class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-gray-200 placeholder-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer">
+                    <label for="edit-product-image-url" class="block text-gray-300 text-sm font-bold mb-2">Product Image URL:</label>
+                    <input type="url" id="edit-product-image-url" placeholder="https://example.com/image.jpg"
+                           class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-gray-200 placeholder-gray-500
+                                  focus:outline-none focus:ring-2 focus:ring-blue-600 transition duration-200">
                     <div class="mt-4 flex justify-center">
                         <img id="edit-image-preview" class="max-w-full max-h-48 rounded-md border border-gray-700 object-contain hidden" alt="Image Preview">
                     </div>
@@ -868,10 +931,12 @@
         let users = []; // New: Fetched from Firestore for user management
 
         const TAX_RATE = 0; // Changed to 0 as per request
-        let productCounter = 1; // Will be determined by existing Firestore product IDs
         let salesInvoiceCounter = 1001; // Will be determined by existing Firestore sales log IDs
         let currentReportFilter = 'daily'; // Default filter for sales report
         let appliedCoupon = null; // New: Stores the currently applied coupon object
+
+        // Notification management
+        const notifiedLowStockItems = new Set(); // Stores product IDs that have already triggered a low stock notification
 
         // --- DOM Elements (Declared with 'let' and assigned inside window.onload) ---
         let appContentWrapperEl; // New wrapper element
@@ -880,12 +945,13 @@
         let inventoryContentEl, inventoryMasterContentEl, masterListEl, masterListSearchEl, masterListLoadingEl;
         let reportLogsContentEl, salesLogListEl, emptyLogsMessageEl, inventoryLoadingEl, salesLogLoadingEl, userIdDisplayEl;
         let messageBoxContainerEl, messageBoxTitleEl, messageBoxTextEl, messageBoxOkBtn, messageBoxCancelBtn;
+        let notificationContainerEl; // New: Notification container
         let manageProductModalContainer, manageProductModalCloseBtn;
         let modalTabAddProductBtn, modalTabRestockProductBtn;
         let modalAddProductContent, modalRestockProductContent;
-        let modalNewProductNameEl, modalNewProductCategoryEl, modalNewProductPriceEl, modalNewProductStockEl, modalNewProductRestockLevelEl, modalNewProductImageEl, modalImagePreviewEl, modalAddProductBtn; // Added modalNewProductCategoryEl
+        let modalNewProductNameEl, modalNewProductCategoryEl, modalNewProductPriceEl, modalNewProductStockEl, modalNewProductRestockLevelEl, modalNewProductImageUrlEl, modalImagePreviewEl, modalAddProductBtn; // Changed to modalNewProductImageUrlEl
         let modalRestockSearchEl, modalRestockListEl, modalApplyRestockBtn;
-        let editProductDetailsModalContainer, editProductDetailsModalCloseBtn, editProductNameEl, editProductCategoryEl, editProductPriceEl, editProductStockEl, editProductRestockLevelEl, editProductImageEl, editImagePreviewEl, editProductSaveBtn; // Added editProductCategoryEl
+        let editProductDetailsModalContainer, editProductDetailsModalCloseBtn, editProductNameEl, editProductCategoryEl, editProductPriceEl, editProductStockEl, editProductRestockLevelEl, editProductImageUrlEl, editImagePreviewEl, editProductSaveBtn; // Changed to editProductImageUrlEl
         let saleSummaryModalContainer, saleSummaryModalCloseBtn, customerNameEl, customerAddressEl, customerContactEl, saleSummaryItemsListEl, summarySubtotalEl, summaryTotalEl, saleSummaryCancelBtn, saleSummaryCheckoutBtn, summaryAppliedDiscountEl; // Added summary applied discount
         let receiptModalContainer, receiptModalContentTemplate, activeReceiptPrintBtn, activeReceiptNewSaleBtn, receiptCloseBtn, receiptDiscountEl, receiptDiscountRowEl; // Added receipt discount
         let salesReportContentEl, filterDailyBtn, filterWeeklyBtn, filterMonthlyBtn, reportTotalSalesEl, reportPeriodInfoEl, reportDetailsListEl, emptyReportMessageEl, emptyItemsSummaryMessageEl, emptyDetailsListMessageEl, downloadReportPdfBtn, reportItemsSummaryEl; // Added emptyDetailsListMessageEl
@@ -963,6 +1029,40 @@
             });
         }
 
+        /**
+         * Displays a non-blocking notification toast.
+         * @param {string} message - The message to display.
+         * @param {string} type - 'info', 'success', 'error', 'low-stock', 'new-sale'
+         * @param {number} [duration=5000] - Duration in milliseconds before auto-dismissing. 0 for permanent.
+         * @returns {HTMLElement} The created notification element.
+         */
+        function showNotification(message, type = 'info', duration = 5000) {
+            const notificationDiv = document.createElement('div');
+            notificationDiv.className = `notification-item ${type}`;
+            notificationDiv.innerHTML = `
+                <span>${message}</span>
+                <button class="close-btn">&times;</button>
+            `;
+            notificationContainerEl.prepend(notificationDiv); // Add to top
+
+            // Animate in
+            setTimeout(() => {
+                notificationDiv.classList.add('show');
+            }, 10); // Small delay for CSS transition to work
+
+            const dismiss = () => {
+                notificationDiv.classList.remove('show');
+                notificationDiv.addEventListener('transitionend', () => notificationDiv.remove());
+            };
+
+            notificationDiv.querySelector('.close-btn').addEventListener('click', dismiss);
+
+            if (duration > 0) {
+                setTimeout(dismiss, duration);
+            }
+            return notificationDiv;
+        }
+
 
         // --- Render Functions ---
 
@@ -996,8 +1096,10 @@
             const sortedItems = [...filteredAndCategorizedItems].sort((a, b) => a.name.localeCompare(b.name));
 
             sortedItems.forEach(item => {
-                // Display the true, current stock level directly from Firestore.
-                const currentAvailableStock = item.stock;
+                // Calculate effective stock considering items already in cart
+                const itemInCart = cart.find(cartItem => cartItem.id === item.id);
+                const quantityInCart = itemInCart ? itemInCart.quantity : 0;
+                const effectiveAvailableStock = item.stock - quantityInCart;
 
                 const itemDiv = document.createElement('div');
                 itemDiv.className = `
@@ -1013,7 +1115,7 @@
                         <div>
                             <h3 class="text-lg font-semibold text-blue-300">${item.name}</h3>
                             <p class="text-sm text-gray-400">Category: <span class="font-medium text-gray-200">${item.category || 'N/A'}</span></p>
-                            <p class="text-sm text-gray-400">Stock: <span class="font-medium text-gray-200">${formatNumber(currentAvailableStock)}</span></p>
+                            <p class="text-sm text-gray-400">Stock: <span class="font-medium text-gray-200">${formatNumber(effectiveAvailableStock)}</span></p>
                         </div>
                     </div>
                     <div class="flex items-center space-x-3">
@@ -1021,8 +1123,8 @@
                         <button data-item-id="${item.id}"
                                 class="add-to-cart-btn px-3 py-1 bg-blue-600 text-white rounded-lg
                                        hover:bg-blue-700 active:bg-blue-800 transition duration-200
-                                       shadow-md text-sm ${currentAvailableStock === 0 ? 'opacity-50 cursor-not-allowed' : ''}"
-                                ${currentAvailableStock === 0 ? 'disabled' : ''}>
+                                       shadow-md text-sm ${effectiveAvailableStock <= 0 ? 'opacity-50 cursor-not-allowed' : ''}"
+                                ${effectiveAvailableStock <= 0 ? 'disabled' : ''}>
                             Add
                         </button>
                     </div>
@@ -1181,7 +1283,7 @@
                 couponCodeInputEl.value = ''; // Clear coupon input field
                 couponStatusMessageEl.textContent = ''; // Clear coupon status message
                 renderCart(); // Re-render the cart UI
-                showMessageBox('Cart Cleared', 'All items have been removed from the cart.');
+                showNotification('Cart Cleared', 'info', 3000);
             }
         }
 
@@ -1525,7 +1627,7 @@
                 let availableStockForAdding = inventoryItem.stock - currentQuantityInCart;
 
                 if (availableStockForAdding <= 0) {
-                    showMessageBox('Out of Stock', 'This item is currently out of stock or all available units are already in your cart.');
+                    showNotification('Out of Stock: ' + inventoryItem.name, 'error', 4000);
                     return;
                 }
 
@@ -1544,6 +1646,7 @@
                     });
                 }
                 renderCart(); // Re-render cart. Inventory UI will update based on its listener.
+                showNotification(`Added ${inventoryItem.name} to cart.`, 'success', 2000);
             } catch (error) {
                 console.error("Error adding item to cart:", error);
                 showMessageBox('Error', 'Failed to add item to cart. Please try again.');
@@ -1581,13 +1684,15 @@
                 const maxAllowed = inventoryItem.stock;
                 if (quantityToSet > maxAllowed) {
                     quantityToSet = maxAllowed;
-                    showMessageBox('Stock Limit Reached', `You can only add up to ${formatNumber(maxAllowed)} of ${inventoryItem.name} to your cart.`);
+                    showNotification(`Only ${formatNumber(maxAllowed)} of ${inventoryItem.name} available.`, 'error', 4000);
                 }
 
                 if (quantityToSet === 0) {
                     cart.splice(cart.findIndex(item => item.id === itemId), 1);
+                    showNotification(`Removed ${inventoryItem.name} from cart.`, 'info', 2000);
                 } else {
                     cartItem.quantity = quantityToSet;
+                    showNotification(`Updated ${inventoryItem.name} quantity to ${formatNumber(quantityToSet)}.`, 'info', 2000);
                 }
 
                 renderCart();
@@ -1610,7 +1715,9 @@
             try {
                 const itemIndex = cart.findIndex(item => item.id === itemId);
                 if (itemIndex > -1) {
+                    const removedItemName = cart[itemIndex].name;
                     cart.splice(itemIndex, 1); // Remove item from local cart array
+                    showNotification(`Removed ${removedItemName} from cart.`, 'info', 2000);
                 }
                 renderCart();
             }
@@ -1697,6 +1804,7 @@
             const price = parseFloat(modalNewProductPriceEl.value);
             const stock = parseInt(modalNewProductStockEl.value);
             const restockLevel = parseInt(modalNewProductRestockLevelEl.value);
+            const imageUrl = modalNewProductImageUrlEl.value.trim(); // Get URL from input
 
             if (!name) {
                 showMessageBox('Input Error', 'Product Name cannot be empty.');
@@ -1718,51 +1826,35 @@
                 showMessageBox('Input Error', 'Please enter a valid restock level (0 or greater).');
                 return;
             }
-
-            let imageUrl = '';
-            if (modalNewProductImageEl.files.length > 0) {
-                const file = modalNewProductImageEl.files[0];
-                try {
-                    imageUrl = await new Promise((resolve, reject) => {
-                        const reader = new FileReader();
-                        reader.onload = () => resolve(reader.result);
-                        reader.onerror = error => reject(error);
-                        reader.readAsDataURL(file);
-                    });
-                } catch (error) {
-                    console.error("Error reading image file:", error);
-                    showMessageBox('Image Error', 'Could not read image file. Please try again.');
-                    return;
-                }
+            if (imageUrl && !/^https?:\/\/.+\.(jpg|jpeg|png|gif|webp|svg)$/i.test(imageUrl)) {
+                 showMessageBox('Input Error', 'Please enter a valid image URL (must start with http/https and end with a common image extension).');
+                 return;
             }
 
-            // Generate a new unique ID for the product
-            // productCounter is now dynamically updated from Firestore to ensure uniqueness
-            const newProductId = 'item-' + String(productCounter++).padStart(3, '0');
             const newProductData = {
                 name: name,
                 category: category, // Save normalized category
                 price: price,
                 stock: stock,
                 restockLevel: restockLevel,
-                imageUrl: imageUrl
+                imageUrl: imageUrl // Use the URL directly
             };
 
             try {
-                // Add the new product to Firestore with the generated ID as document ID
-                // Use currentAppId for the Firestore path
-                const docRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/inventory`, newProductId);
-                await firebase.setDoc(docRef, newProductData);
+                // Add the new product to Firestore, let Firestore generate the ID
+                const docRef = await firebase.addDoc(firebase.collection(db, `artifacts/${currentAppId}/public/data/inventory`), newProductData);
 
+                // Clear form
                 modalNewProductNameEl.value = '';
                 modalNewProductCategoryEl.value = ''; // Clear category
                 modalNewProductPriceEl.value = '';
                 modalNewProductStockEl.value = '';
                 modalNewProductRestockLevelEl.value = '10'; // Reset to default
-                modalNewProductImageEl.value = ''; // Clear file input
+                modalNewProductImageUrlEl.value = ''; // Clear URL input
+                modalImagePreviewEl.src = ''; // Clear preview
                 modalImagePreviewEl.classList.add('hidden'); // Hide preview
 
-                showMessageBox('Product Added', `${name} has been added to inventory.`);
+                showNotification('Product Added', 'success', 3000);
                 closeManageProductModal();
             } catch (error) {
                 console.error("Error adding new product to Firestore:", error);
@@ -1801,7 +1893,7 @@
             if (restockedCount > 0) {
                 try {
                     await Promise.all(updates); // Execute all updates concurrently
-                    showMessageBox('Restock Complete', `Successfully restocked ${restockedCount} product(s) with a total of ${formatNumber(totalRestockedUnits)} units.`);
+                    showNotification(`Successfully restocked ${restockedCount} product(s) with a total of ${formatNumber(totalRestockedUnits)} units.`, 'success', 4000);
                     closeManageProductModal();
                 } catch (error) {
                     console.error("Error applying restock:", error);
@@ -1834,7 +1926,7 @@
             editProductPriceEl.value = itemToEdit.price;
             editProductStockEl.value = itemToEdit.stock;
             editProductRestockLevelEl.value = itemToEdit.restockLevel || '';
-            editProductImageEl.value = ''; // Clear file input as it's for new file upload
+            editProductImageUrlEl.value = itemToEdit.imageUrl || ''; // Populate URL input
 
             // Display current image or a placeholder
             if (itemToEdit.imageUrl) {
@@ -1863,7 +1955,7 @@
             editProductPriceEl.value = '';
             editProductStockEl.value = '';
             editProductRestockLevelEl.value = '';
-            editProductImageEl.value = '';
+            editProductImageUrlEl.value = ''; // Clear URL input
             editImagePreviewEl.src = '';
             editImagePreviewEl.classList.add('hidden');
             delete editProductSaveBtn.dataset.editingItemId; // Remove the stored ID
@@ -1889,6 +1981,7 @@
             const price = parseFloat(editProductPriceEl.value);
             const stock = parseInt(editProductStockEl.value);
             const restockLevel = parseInt(editProductRestockLevelEl.value);
+            const imageUrl = editProductImageUrlEl.value.trim(); // Get URL from input
 
             if (!name) {
                 showMessageBox('Input Error', 'Product Name cannot be empty.');
@@ -1910,23 +2003,11 @@
                 showMessageBox('Input Error', 'Please enter a valid restock level (0 or greater).');
                 return;
             }
-
-            let imageUrl = inventory.find(item => item.id === itemId)?.imageUrl || ''; // Keep existing image if not changed
-            if (editProductImageEl.files.length > 0) {
-                const file = editProductImageEl.files[0];
-                try {
-                    imageUrl = await new Promise((resolve, reject) => {
-                        const reader = new FileReader();
-                        reader.onload = () => resolve(reader.result);
-                        reader.onerror = error => reject(error);
-                        reader.readAsDataURL(file);
-                    });
-                } catch (error) {
-                    console.error("Error reading new image file:", error);
-                    showMessageBox('Image Error', 'Could not read new image file. Please try again.');
-                    return;
-                }
+            if (imageUrl && !/^https?:\/\/.+\.(jpg|jpeg|png|gif|webp|svg)$/i.test(imageUrl)) {
+                 showMessageBox('Input Error', 'Please enter a valid image URL (must start with http/https and end with a common image extension).');
+                 return;
             }
+
 
             const updatedProductData = {
                 name: name,
@@ -1934,7 +2015,7 @@
                 price: price,
                 stock: stock,
                 restockLevel: restockLevel,
-                imageUrl: imageUrl
+                imageUrl: imageUrl // Use the URL directly
             };
 
             try {
@@ -1942,7 +2023,7 @@
                 const docRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/inventory`, itemId);
                 await firebase.updateDoc(docRef, updatedProductData);
 
-                showMessageBox('Success', `${name} updated successfully.`);
+                showNotification(`${name} updated successfully.`, 'success', 3000);
                 closeEditProductDetailsModal();
             } catch (error) {
                 console.error("Error updating product:", error);
@@ -1972,7 +2053,7 @@
                     // Use currentAppId for the Firestore path
                     const docRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/inventory`, itemId);
                     await firebase.deleteDoc(docRef);
-                    showMessageBox('Success', 'Product deleted successfully.');
+                    showNotification('Product deleted successfully.', 'success', 3000);
                 } catch (error) {
                     console.error("Error deleting product:", error);
                     showMessageBox('Error', 'Failed to delete product. Please try again.');
@@ -2087,7 +2168,8 @@
             modalNewProductPriceEl.value = '';
             modalNewProductStockEl.value = '';
             modalNewProductRestockLevelEl.value = '10'; // Reset to default
-            modalNewProductImageEl.value = ''; // Clear file input
+            modalNewProductImageUrlEl.value = ''; // Clear URL input
+            modalImagePreviewEl.src = ''; // Clear preview
             modalImagePreviewEl.classList.add('hidden'); // Hide preview
 
             // Clear restock search and re-render restock list in case modal is opened again
@@ -2415,7 +2497,7 @@
                         await transaction.set(firebase.doc(firebase.collection(db, `artifacts/${currentAppId}/public/data/salesLogs`), salesInvoiceId), completedSale);
                     });
 
-                    showMessageBox('Sale Complete', `Sale finalized successfully! Invoice ID: ${salesInvoiceId}`);
+                    showNotification(`Sale finalized! Invoice ID: ${salesInvoiceId}`, 'new-sale', 5000);
                     closeSaleSummaryModal(); // Close the checkout summary modal
                     // The cart will be cleared when the receipt modal is closed or a new sale is initiated.
                     displayReceiptModal(
@@ -2517,7 +2599,7 @@
                         console.log(`[Void Sale] Sale ${invoiceId} marked as voided.`);
                     });
 
-                    showMessageBox('Sale Voided', `Sale ${invoiceId} has been successfully voided and stock returned.`);
+                    showNotification(`Sale ${invoiceId} has been voided. Stock returned.`, 'info', 4000);
                     // UI will update via onSnapshot listener
                 } catch (error) {
                     console.error("[Void Sale] Error voiding sale:", error);
@@ -2909,7 +2991,7 @@
             });
 
             doc.save(`Sales_Report_${currentReportFilter}_${new Date().toISOString().slice(0, 10)}.pdf`);
-            showMessageBox('Success', 'Sales report downloaded successfully as PDF!');
+            showNotification('Sales report downloaded successfully as PDF!', 'success', 3000);
         }
 
         // --- Coupon Management Functions ---
@@ -3063,7 +3145,7 @@
             try {
                 // Add coupon to Firestore, letting Firestore auto-generate ID
                 const docRef = await firebase.addDoc(firebase.collection(db, `artifacts/${currentAppId}/public/data/coupons`), newCoupon);
-                showMessageBox('Success', `Coupon "${code}" created successfully!`);
+                showNotification(`Coupon "${code}" created successfully!`, 'success', 3000);
 
                 // Clear form
                 newCouponCodeEl.value = '';
@@ -3105,7 +3187,7 @@
                 try {
                     const couponDocRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/coupons`, couponId);
                     await firebase.updateDoc(couponDocRef, { isActive: newStatus });
-                    showMessageBox('Success', `Coupon "${couponToToggle.code}" is now ${newStatus ? 'active' : 'inactive'}.`);
+                    showNotification(`Coupon "${couponToToggle.code}" is now ${newStatus ? 'active' : 'inactive'}.`, 'info', 3000);
                     // Listener will re-render
                 } catch (error) {
                     console.error("Error toggling coupon status:", error);
@@ -3134,7 +3216,7 @@
                 try {
                     const couponDocRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/coupons`, couponId);
                     await firebase.deleteDoc(couponDocRef);
-                    showMessageBox('Success', 'Coupon deleted successfully.');
+                    showNotification('Coupon deleted successfully.', 'success', 3000);
                     // Listener will re-render
                 } catch (error) {
                     console.error("Error deleting coupon:", error);
@@ -3200,6 +3282,7 @@
             couponStatusMessageEl.textContent = `Coupon "${foundCoupon.code}" applied!`;
             appliedDiscountDisplayRowEl.classList.remove('hidden'); // Show discount row
             calculateTotals();
+            showNotification(`Coupon "${foundCoupon.code}" applied!`, 'success', 3000);
         }
 
         // --- User Management Functions ---
@@ -3342,7 +3425,7 @@
                 try {
                     const userDocRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/users`, id);
                     await firebase.updateDoc(userDocRef, { role: newRole });
-                    showMessageBox('Success', `Role for "${userEmail}" updated to "${newRole}" successfully.`);
+                    showNotification(`Role for "${userEmail}" updated to "${newRole}" successfully.`, 'success', 3000);
                     closeEditUserRoleModal();
                 } catch (error) {
                     console.error("Error updating user role:", error);
@@ -3381,7 +3464,7 @@
                 try {
                     const userDocRef = firebase.doc(db, `artifacts/${currentAppId}/public/data/users`, id);
                     await firebase.deleteDoc(userDocRef);
-                    showMessageBox('Success', `User "${email}" role deleted successfully.`);
+                    showNotification(`User "${email}" role deleted successfully.`, 'success', 3000);
                     // Listener will re-render the user list
                 } catch (error) {
                     console.error("Error deleting user role:", error);
@@ -3420,17 +3503,22 @@
             masterListLoadingEl.classList.remove('hidden'); // Also show loading for master list
             inventoryUnsubscribe = firebase.onSnapshot(inventoryCollectionRef, async (snapshot) => {
                 const fetchedInventory = [];
-                let maxProductIdNum = 0; // Initialize to track max product ID number
                 snapshot.forEach(doc => {
                     fetchedInventory.push({ id: doc.id, ...doc.data() });
-                    // Extract number from 'item-XXX' ID
-                    const match = doc.id.match(/^item-(\d+)$/);
-                    if (match && parseInt(match[1]) > maxProductIdNum) {
-                        maxProductIdNum = parseInt(match[1]);
-                    }
                 });
                 inventory = fetchedInventory; // Update global inventory array
-                productCounter = maxProductIdNum + 1; // Set productCounter for next unique ID
+
+                // Check for low stock notifications
+                inventory.forEach(item => {
+                    if (item.stock <= item.restockLevel && item.stock > 0 && !notifiedLowStockItems.has(item.id)) {
+                        showNotification(`Low Stock Alert: ${item.name} is at ${formatNumber(item.stock)} units!`, 'low-stock', 0); // Permanent notification
+                        notifiedLowStockItems.add(item.id); // Mark as notified
+                    } else if (item.stock > item.restockLevel && notifiedLowStockItems.has(item.id)) {
+                        // If stock recovered, remove from notified list
+                        notifiedLowStockItems.delete(item.id);
+                    }
+                });
+
 
                 populateCategoryFilter(); // Populate category filter when inventory updates
                 renderInventory(getFilteredInventory()); // Re-render current view with new data
@@ -3438,8 +3526,6 @@
                 inventoryLoadingEl.classList.add('hidden');
                 masterListLoadingEl.classList.add('hidden');
 
-                // Removed initial data population
-                // The inventory will now truly be empty if the collection is empty.
             }, (error) => {
                 console.error("Error listening to inventory:", error);
                 // Only show data error if user is logged in, as guests won't have access anyway
@@ -3454,9 +3540,30 @@
             salesLogLoadingEl.classList.remove('hidden');
             salesLogsUnsubscribe = firebase.onSnapshot(salesLogsCollectionRef, (snapshot) => {
                 const fetchedSalesLogs = [];
+                let latestSaleTimestamp = 0; // To track the latest sale for notifications
+
                 snapshot.forEach(doc => {
-                    fetchedSalesLogs.push({ id: doc.id, ...doc.data() });
+                    const saleData = { id: doc.id, ...doc.data() };
+                    fetchedSalesLogs.push(saleData);
+
+                    // Check for new sales for notification
+                    const saleTime = saleData.timestamp.toDate ? saleData.timestamp.toDate().getTime() : new Date(saleData.timestamp).getTime();
+                    if (saleTime > latestSaleTimestamp) {
+                        latestSaleTimestamp = saleTime;
+                    }
                 });
+
+                // Check if a new sale occurred (simple check: if new snapshot has more sales, or a newer timestamp)
+                // This is a basic check; for robust new sale detection in real-time,
+                // you might need to compare the previous state of salesLogs or use a dedicated "last updated" field.
+                if (salesLogs.length > 0 && fetchedSalesLogs.length > salesLogs.length) {
+                    const newSales = fetchedSalesLogs.filter(newSale => !salesLogs.some(oldSale => oldSale.id === newSale.id));
+                    newSales.forEach(sale => {
+                        if (!sale.isVoided) { // Only notify for non-voided sales
+                            showNotification(`New Sale! Invoice ID: ${sale.salesInvoiceId}`, 'new-sale', 5000);
+                        }
+                    });
+                }
                 salesLogs = fetchedSalesLogs; // Update global salesLogs array
                 renderReportLogs(); // Re-render the report logs
                 renderSalesReport(); // Re-render the sales report with new data
@@ -3620,7 +3727,7 @@
             try {
                 const userCredential = await firebase.signInWithEmailAndPassword(auth, email, password);
                 // Auth state listener will handle updating UI and userRole
-                showMessageBox('Login Success', `Welcome, ${userCredential.user.email}!`);
+                showNotification(`Welcome, ${userCredential.user.email}!`, 'success', 3000);
             } catch (error) {
                 console.error("Login error:", error);
                 let errorMessage = 'Login failed. Please check your credentials.';
@@ -3645,7 +3752,7 @@
             if (confirmed) {
                 try {
                     await firebase.signOut(auth);
-                    showMessageBox('Logout Success', 'You have been logged out.');
+                    showNotification('You have been logged out.', 'info', 3000);
                     // onAuthStateChanged will handle role and UI update and showing login modal
                 } catch (error) {
                     console.error("Logout error:", error);
@@ -3695,7 +3802,7 @@
                     createdAt: firebase.serverTimestamp()
                 });
 
-                showMessageBox('User Added', `User "${email}" added successfully. Please note: The current admin session has been replaced by the new user. You may need to manually re-login as admin.`);
+                showNotification(`User "${email}" added successfully! Admin session changed. Please re-login.`, 'info', 7000);
 
                 // Clear form
                 newUserEmailEl.value = '';
@@ -3773,6 +3880,8 @@
             messageBoxOkBtn = document.getElementById('message-box-ok');
             messageBoxCancelBtn = document.getElementById('message-box-cancel');
 
+            notificationContainerEl = document.getElementById('notification-container'); // Get notification container
+
             manageProductModalContainer = document.getElementById('manage-product-modal-container');
             manageProductModalCloseBtn = document.getElementById('manage-product-modal-close-btn');
 
@@ -3787,7 +3896,7 @@
             modalNewProductPriceEl = document.getElementById('modal-new-product-price');
             modalNewProductStockEl = document.getElementById('modal-new-product-stock');
             modalNewProductRestockLevelEl = document.getElementById('modal-new-product-restock-level');
-            modalNewProductImageEl = document.getElementById('modal-new-product-image');
+            modalNewProductImageUrlEl = document.getElementById('modal-new-product-image-url'); // Get URL input
             modalImagePreviewEl = document.getElementById('modal-image-preview');
             modalAddProductBtn = document.getElementById('modal-add-product-btn');
 
@@ -3802,7 +3911,7 @@
             editProductPriceEl = document.getElementById('edit-product-price');
             editProductStockEl = document.getElementById('edit-product-stock');
             editProductRestockLevelEl = document.getElementById('edit-product-restock-level');
-            editProductImageEl = document.getElementById('edit-product-image');
+            editProductImageUrlEl = document.getElementById('edit-product-image-url'); // Get URL input
             editImagePreviewEl = document.getElementById('edit-image-preview');
             editProductSaveBtn = document.getElementById('edit-product-save-btn');
 
@@ -3977,6 +4086,7 @@
                         appliedCoupon = null; // Clear applied coupon
                         couponCodeInputEl.value = ''; // Clear coupon input
                         couponStatusMessageEl.textContent = ''; // Clear coupon message
+                        notifiedLowStockItems.clear(); // Clear low stock notifications on logout
                         renderInventory();
                         renderCart();
                         renderReportLogs();
@@ -4035,15 +4145,11 @@
             modalTabAddProductBtn.addEventListener('click', () => switchModalTab('add-product'));
             modalTabRestockProductBtn.addEventListener('click', () => switchModalTab('restock-product'));
             modalAddProductBtn.addEventListener('click', addNewProduct);
-            modalNewProductImageEl.addEventListener('change', (event) => {
-                const file = event.target.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onload = (e) => {
-                        modalImagePreviewEl.src = e.target.result;
-                        modalImagePreviewEl.classList.remove('hidden');
-                    };
-                    reader.readAsDataURL(file);
+            modalNewProductImageUrlEl.addEventListener('input', (event) => { // Listen to input for URL
+                const url = event.target.value.trim();
+                if (url) {
+                    modalImagePreviewEl.src = url;
+                    modalImagePreviewEl.classList.remove('hidden');
                 } else {
                     modalImagePreviewEl.src = '';
                     modalImagePreviewEl.classList.add('hidden');
@@ -4059,15 +4165,11 @@
             // Edit Product Details Modal listeners
             editProductDetailsModalCloseBtn.addEventListener('click', closeEditProductDetailsModal);
             editProductSaveBtn.addEventListener('click', saveEditedProduct);
-            editProductImageEl.addEventListener('change', (event) => {
-                const file = event.target.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onload = (e) => {
-                        editImagePreviewEl.src = e.target.result;
-                        editImagePreviewEl.classList.remove('hidden');
-                    };
-                    reader.readAsDataURL(file);
+            editProductImageUrlEl.addEventListener('input', (event) => { // Listen to input for URL
+                const url = event.target.value.trim();
+                if (url) {
+                    editImagePreviewEl.src = url;
+                    editImagePreviewEl.classList.remove('hidden');
                 } else {
                     editImagePreviewEl.src = '';
                     editImagePreviewEl.classList.add('hidden');
